@@ -1,0 +1,4 @@
+1. Open terminal:
+   nano ~/.config/lxsession/LXDE-pi/autostart
+2. Add line at the bottom
+   @python3 /home/pi/program_folder/main.py

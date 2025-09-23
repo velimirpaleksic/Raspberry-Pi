@@ -1,0 +1,6 @@
+1. Connect your USB or network printer
+2. Check available printers:
+   lpstat -p
+3. Note the printer name
+4. In main.py, replace 'Printer_Name' in the os.system() command:
+   os.system(f"libreoffice --headless --pt 'Printer_Name' docs/output.docx")
