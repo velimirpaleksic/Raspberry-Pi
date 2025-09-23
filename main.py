@@ -43,8 +43,7 @@ for row in keyboard_rows:
     row_frame = tk.Frame(keyboard_frame)
     row_frame.pack(pady=5)
     for key in row:
-        btn = tk.Button(row_frame, text=key, width=6, height=2,
-                        command=lambda k=key: key_press(k))
+        btn = tk.Button(row_frame, text=key, width=6, height=2, command=lambda k=key: key_press(k))
         btn.pack(side="left", padx=2)
 
 # Save and update document
@@ -66,8 +65,11 @@ def save_document():
     doc.save(OUTPUT_FILE)
     messagebox.showinfo("Success", f"Document saved as {OUTPUT_FILE}")
 
-    # Optional: Send to printer (Linux command)
+    # Send to printer (Linux command)
     os.system(f"libreoffice --headless --pt 'Printer_Name' {OUTPUT_FILE}")
+
+    # Delete file after printing
+    os.remove(OUTPUT_FILE)
 
 # Print button
 print_btn = tk.Button(root, text="Print", font=("Arial", 14), command=save_document)
