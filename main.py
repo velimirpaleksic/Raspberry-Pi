@@ -6,6 +6,7 @@ import os
 # Path to your template file
 TEMPLATE_FILE = "docs/template.docx"
 OUTPUT_FILE = "docs/output.docx"
+PRINTER_NAME = "Printer_Name"
 
 root = tk.Tk()
 root.title("Window")
@@ -66,7 +67,7 @@ def save_document():
     messagebox.showinfo("Success", f"Document saved as {OUTPUT_FILE}")
 
     # Send to printer (Linux command)
-    os.system(f"libreoffice --headless --pt 'Printer_Name' {OUTPUT_FILE}")
+    os.system(f"libreoffice --headless --pt '{PRINTER_NAME}' {OUTPUT_FILE}")
 
     # Delete file after printing
     os.remove(OUTPUT_FILE)
