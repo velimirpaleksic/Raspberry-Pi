@@ -1,3 +1,7 @@
+# Kod
+1. Ekrani - početni (tutorial) ekran, status printanja, završni ekran
+2. Validacija polja (Ime i prezime, ime roditelja itd..)
+
 # Dokumentacije
 1. Kako napraviti novi template file
 2. Kako promjeniti djelovodni broj
