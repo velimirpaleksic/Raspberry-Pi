@@ -1,4 +1,4 @@
-1. Zamijeniti tekst sa dinamičkim podatcima
+1. Zamijeniti tekst sa dinamičkim podacima
 Djelovodni broj: {{DJELOVODNI_BROJ}}
 
 Lista svih dinamičkih podataka (iz app.py):
