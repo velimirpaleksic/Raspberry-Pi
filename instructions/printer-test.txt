@@ -1,0 +1,37 @@
+1. Da li kernel prepoznaje usb uredjaje
+Komanda: lsusb
+Output: Bus 001 Device 004: ID 03f0:002a Hewlett-Packard LaserJet P1102
+
+2. Da li CUPS servis radi
+systemctl status cups
+
+Ako nije aktiviran:
+sudo systemctl start cups
+sudo systemctl enable cups
+
+3. Lista printera
+lpstat -p -d
+
+4. Test print (CUPS)
+echo "Test print" | lp -d HP-LaserJet-Professional-P1102
+echo "Test print" | lp
+
+5. Test print (LPR)
+echo "Test print" | lpr -d HP-LaserJet-Professional-P1102
+echo "Test print" | lpr
+
+6. Test print (HPLIP)
+hp-testpage
+ili
+sudo hp-setup -i (za setup printera)
+
+7. Test print (.PDF file)
+lp test.pdf
+lpr -P HP-LaserJet-Professional-P1102 test.pdf
+
+8. Web interfejs (CUPS)
+http://localhost:631
+
+9. Logovi za greške
+journalctl -u cups -f
+hp-plugin -i

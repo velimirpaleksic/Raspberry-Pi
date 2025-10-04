@@ -1,0 +1,14 @@
+1. Zamijeniti tekst sa dinamičkim podatcima
+Djelovodni broj: {{DJELOVODNI_BROJ}}
+
+Lista svih dinamičkih podataka (iz app.py):
+        "{{DJELOVODNI_BROJ}}": DJELOVODNI_BROJ, // Podatak koji se mijenja svake godine i zahtijeva zadužene da ga promijene
+        "{{DANASNJI_DATUM}}": DANASNJI_DATUM,   // Podatak koji se ne mijenja već je automatski dat (skripta config.py)
+        "{{IME}}": ime,                         // Ime i prezime učenika
+        "{{RODITELJ}}": roditelj,               // Ime roditelja
+        "{{DATUM_RODJENJA}}": datum_rodjenja,   // Datum rođenja učenika
+        "{{MJESTO}}": mjesto,                   // Mjesto rođenja učenika
+        "{{OPSTINA}}": opstina,                 // Opština u kojoj se nalazi mjesto rođenja
+        "{{RAZRED}}": razred,                   // Trenutni razred (Prvi, drugi, treći, četvrti)
+        "{{STRUKA}}": struka,                   // Struka učenika
+        "{{REASON}}": reason,                   // Razlog zbog kojeg se vadi potvrda

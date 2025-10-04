@@ -1,0 +1,30 @@
+1. LXDE Autostart
+nano ~/.config/lxsession/LXDE-pi/autostart
+
+2. Dodati na kraj fajla
+@python3 /home/pi/program_folder/main.py
+
+---
+
+1. systemd + X11
+sudo nano /etc/systemd/system/myapp.service
+
+2. Ubacit
+[Unit]
+Description=Tkinter App
+After=graphical.target
+
+[Service]
+User=pi
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/pi/.Xauthority
+ExecStart=/usr/bin/python3 /home/pi/program_folder/main.py
+Restart=always
+
+[Install]
+WantedBy=graphical.target
+
+3. Omogućiti servis
+sudo systemctl daemon-reexec
+sudo systemctl enable myapp.service
+sudo systemctl start myapp.service
