@@ -1,6 +1,6 @@
 1. Update sistema
 sudo apt-get update
-sudo apt install -y cups cups-bsd hplip
+sudo apt install -y hplip printer-driver-hpcups
 
 2. Pokrenuti setup
 sudo hp-setup -i
@@ -14,14 +14,5 @@ Output: printer HP_LaserJet_Professional_P1102 is idle.  enabled since ...
 
 
 Ostalo:
-1. Dodavanje pi korisnika kao admina u CUPS servis
-sudo usermod -a -G lpadmin $(whoami)
-sudo sed -i 's/Listen localhost:631/Listen *:631/' /etc/cups/cupsd.conf
-
-2. Restartovanje CUPS servira u slucaju da ne radi
-Da li CUPS servis radi:
-systemctl status cups
-
-Ako nije aktiviran:
-sudo systemctl start cups
-sudo systemctl enable cups
+Status i greške HP printera
+hp-toolbox
