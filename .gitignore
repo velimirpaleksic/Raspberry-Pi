@@ -1,0 +1,33 @@
+# Other
+COMMON-ERRORS.md
+credits_text.txt
+instructions/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+env/
+venv/
+.venv/
+.pytest_cache
+.github
+
+# SQLite and logs
+*.db
+*.log
+
+# Application runtime
+print_queue/
+tmp/
+error_logs/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# SQLite and logs
+*.db
+*.log
