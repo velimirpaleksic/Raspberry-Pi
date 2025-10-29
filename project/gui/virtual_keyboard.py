@@ -14,7 +14,7 @@ class VirtualKeyboard(tk.Frame):
         kbd_rows = [
             list("љњертзуиопшђ"),
             list("асдфгхјклчћж"),
-            list("ѕџцвбнм"),
+            list("џцвбнм"),
         ]
 
         for row_keys in kbd_rows:
