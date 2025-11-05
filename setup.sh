@@ -1,36 +1,46 @@
 #!/bin/bash
-set -e  # Exit on first error
+set -euo pipefail  # strict error handling
 
-# === MARK ===
+# === Paths ===
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-DB_SCRIPT="$PROJECT_ROOT/db/db.py"
-REQUIREMENTS_FILE="$(cd "$PROJECT_ROOT/../" && pwd)/requirements.txt"
+PROJECT_ROOT="$SCRIPT_DIR"
+REQUIREMENTS_FILE="$PROJECT_ROOT/requirements.txt"
+DB_SCRIPT="$PROJECT_ROOT/project/db/db.py"
+
+# === Logging helpers ===
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No color
+
+log_info()    { echo -e "${YELLOW}[INFO]${NC} $1"; }
+log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+log_error()   { echo -e "${RED}[ERROR]${NC} $1"; }
 
 # === Functions ===
 install_requirements() {
     if [[ -f "$REQUIREMENTS_FILE" ]]; then
-        echo "[REQUIREMENTS] Installing requirements..."
-        python3 -m pip install --upgrade pip
+        log_info "Upgrading pip and installing requirements..."
+        python3 -m pip install --upgrade pip setuptools wheel
         python3 -m pip install -r "$REQUIREMENTS_FILE"
-        echo "[REQUIREMENTS] Requirements installed successfully."
+        log_success "Requirements installed successfully."
     else
-        echo "[REQUIREMENTS] No requirements.txt found, skipping installation."
+        log_error "requirements.txt not found at: $REQUIREMENTS_FILE"
     fi
 }
 
 create_database() {
     if [[ -f "$DB_SCRIPT" ]]; then
-        echo "[DB] Creating database..."
+        log_info "Running database setup..."
         python3 "$DB_SCRIPT"
-        echo "[DB] Database setup complete."
+        log_success "Database setup complete."
     else
-        echo "[DB] Database script not found at: $DB_SCRIPT"
+        log_error "Database script not found at: $DB_SCRIPT"
     fi
 }
 
 # === Main ===
-echo "[SETUP] Starting setup..."
+log_info "Starting setup..."
 install_requirements
 create_database
-echo "[SETUP] Setup complete. You can add cron job with: crontab -e"
+log_success "Setup complete. You can add a cron job with: crontab -e"
