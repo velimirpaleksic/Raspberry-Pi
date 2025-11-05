@@ -1,4 +1,2 @@
 python-docx
 docx2pdf
-sqlite3
-pycups
