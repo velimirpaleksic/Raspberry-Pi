@@ -25,7 +25,7 @@ class VirtualKeyboard(tk.Frame):
                               command=lambda c=ch: self.insert_char(c))
                 b.pack(side="left", padx=1)
 
-        # control row
+        # Control row
         ctrl_row = tk.Frame(self)
         ctrl_row.pack(side="top", pady=6)
         tk.Button(ctrl_row, text="Backspace", width=10, command=self.backspace_pressed).pack(side="left", padx=4)
@@ -69,7 +69,7 @@ class VirtualKeyboard(tk.Frame):
             return
         if isinstance(w, tk.Entry):
             w.delete(0, "end")
-            # restore placeholder if this is mjesto or opstina
+            # Restore placeholder if this is mjesto or opstina
             from project.gui.ui_components import add_placeholder
 
             if w is self.mjesto_entry and self.mjesto_placeholder:
