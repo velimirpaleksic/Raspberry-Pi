@@ -3,7 +3,7 @@ set -e
 
 echo "[INFO] Checking current session..."
 if [ "$XDG_SESSION_TYPE" = "wayland" ]; then
-    echo "[WARN] Wayland detected — touchscreen will NOT work."
+    echo "[WARN] Wayland detected, touchscreen will NOT work."
     echo "[INFO] Switching system to X11..."
 
     sudo sed -i 's/#WaylandEnable=false/WaylandEnable=false/' /etc/gdm3/custom.conf || true
@@ -14,7 +14,7 @@ if [ "$XDG_SESSION_TYPE" = "wayland" ]; then
     echo "[INFO] Re-login and run this command again."
     exit 0
 else
-    echo "[SUCCESS] X11 is active — good."
+    echo "[SUCCESS] X11 is active, good."
 fi
 
 echo "[INFO] Installing touchscreen packages..."
