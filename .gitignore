@@ -27,6 +27,7 @@ error_logs/
 dist/
 build/
 *.egg-info/
+demo/
 
 # SQLite and logs
 *.db

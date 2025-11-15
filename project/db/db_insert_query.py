@@ -40,7 +40,7 @@ def insert_entry(
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (ime, roditelj, godina, mjesec, dan, mjesto, opstina, razred, struka, razlog))
 
-            # Commit happens automatically when context exits
+        # Commit happens automatically when context exits
         print("[DB] New entry successfully added.")
 
     except Exception as e:
