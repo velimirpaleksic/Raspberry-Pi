@@ -14,7 +14,7 @@ def maintain_db():
         with get_connection() as conn:
             cursor = conn.cursor()
 
-            # Optional: get approximate count (might be slow)
+            # Get approximate count (might be slow)
             cursor.execute("SELECT COUNT(*) FROM print_logs")
             total = cursor.fetchone()[0]
 
@@ -35,7 +35,7 @@ def maintain_db():
                 conn.commit()
                 overflow -= delete_count
 
-            # Optional VACUUM - only once at the end
+            # VACUUM - only once at the end
             cursor.execute("VACUUM;")
             print("[DB] Maintenance complete.")
 
@@ -94,7 +94,7 @@ def warn_if_low_disk_space():
     import shutil
     total, used, free = shutil.disk_usage("/")
 
-    if free < 512*1024*1024:  # less than 512MB (0.5GB) free
+    if free < 512*1024*1024:  # Less than 512MB (0.5GB) free
         print(f"[WARN] Low disk space: {free // (1024*1024)} MB free, consider cleanup")
 
 
