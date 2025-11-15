@@ -19,7 +19,7 @@ class FormScreen(tk.Frame):
             self.manager = manager
             self.status_screen = status_screen
 
-            # --- Ensure PrintingStatusScreen is available ---
+            # Ensure PrintingStatusScreen is available
             try:
                 if not hasattr(self, "status_screen") or self.status_screen is None:
                     if hasattr(self.manager, "frames") and "PrintingStatusScreen" in self.manager.frames:
@@ -35,21 +35,21 @@ class FormScreen(tk.Frame):
                 self.status_screen = None
                 return
 
-            # --- Build UI elements ---
+            # Build UI elements
             self._build_ui_()
 
         except Exception as e:
             error_logging(f"Failed to initialize 'PrintingStatusScreen': {e}")
             return
 
-        # Debug Data
+        # Debug data
         if DEBUG_MODE:
             self.fill_debug_data()
 
 
     def _build_ui_(self):
         try:
-            # --- Tkinter variables ---
+            # Tkinter variables
             self.ime_var = tk.StringVar()
             self.roditelj_var = tk.StringVar()
             self.mjesto_var = tk.StringVar()
@@ -61,7 +61,7 @@ class FormScreen(tk.Frame):
             self.mjesec_var = tk.StringVar()
             self.godina_var = tk.StringVar()
         
-            # --- Form creation ---
+            # Form creation
             main = tk.Frame(self, padx=20, pady=20)
             main.pack(fill="both", expand=True)
             main.columnconfigure(0, weight=1)
