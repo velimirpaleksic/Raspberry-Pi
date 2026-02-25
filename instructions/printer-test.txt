@@ -1,0 +1,15 @@
+1. Da li kernel prepoznaje usb uredjaje
+Komanda: lsusb
+Output: Bus 001 Device 004: ID 03f0:002a Hewlett-Packard LaserJet P1102
+
+2. Setup printera
+sudo hp-setup - i
+> Ostatak na printer-setup.txt
+
+3. Test print (HPLIP)
+hp-testpage
+
+4. Test print (PDF file)
+hp-print output.pdf
+Ako ima više printera:
+hp-print -d "HP_LaserJet_Professional_P1102" output.pdf

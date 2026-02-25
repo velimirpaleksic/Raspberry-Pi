@@ -1,0 +1,20 @@
+1. Pronaći IP Adresu Raspberry Pi
+Na Raspberry Pi-u, otvoriti terminal i ukucati:
+Komanda: hostname -I
+Primjer rezultata: 192.168.4.1
+
+Ako nemate pristup Raspberry Pi-u, moguće je pronaći preko rutera / DHCP liste pod "connected devices"
+
+2. Povezati sa Windowsom
+u CMD/PowerShell na Windowsu ukucati:
+Komanda: ssh username@<IP_RASPBERRY_PI>
+Primjer: ssh 28juni@192.168.4.1
+
+Poslije toga unijeti lozinku
+
+3. Preko PuTTY
+- Pokrenuti PuTTY
+- Host Name (or IP address): 192.168.4.1 (Vaš IP ovde)
+- Connection type: SSH
+- Kliknuti Open, pojaviće se terminal
+- Login kao 28juni, lozinka 12345678 (Primjer)
