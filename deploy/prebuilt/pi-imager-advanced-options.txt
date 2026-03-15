@@ -1,0 +1,7 @@
+Raspberry Pi Imager - Advanced Options prijedlog
+
+- Set hostname: uvjerenja-pi
+- Enable SSH: only if servis/održavanje to traži
+- Set username/password: dedicated deployment account
+- Configure wireless LAN: opcionalno, može i kroz touchscreen wizard
+- Set locale settings: Europe/Sarajevo, keyboard po potrebi

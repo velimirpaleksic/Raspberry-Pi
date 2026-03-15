@@ -3,7 +3,7 @@ import sqlite3
 import os
 
 from project.core.config import DB_PATH
-from project.utils.logging_utils import error_logging
+from project.utils.logging_utils import log_error
 
 
 def _apply_pragmas(conn: sqlite3.Connection):
@@ -30,5 +30,5 @@ def get_connection():
         return conn
     
     except Exception as e:
-        error_logging(f"[DB] Connection failed: {e}")
+        log_error(f"[DB] Connection failed: {e}")
         raise

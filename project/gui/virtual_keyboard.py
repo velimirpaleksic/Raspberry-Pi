@@ -1,11 +1,13 @@
 # gui/virtual_keyboard.py
 import tkinter as tk
 
+from project.gui.ui_components import THEME, polish_descendant_buttons
+
 
 class VirtualKeyboard(tk.Frame):
     def __init__(self, parent, mjesto_entry=None, opstina_entry=None,
                  mjesto_placeholder=None, opstina_placeholder=None, *args, **kwargs):
-        super().__init__(parent, relief="raised", bd=2, padx=6, pady=6, *args, **kwargs)
+        super().__init__(parent, relief="raised", bd=2, padx=6, pady=6, bg=THEME["card"], *args, **kwargs)
         self.mjesto_entry = mjesto_entry
         self.opstina_entry = opstina_entry
         self.mjesto_placeholder = mjesto_placeholder
@@ -18,7 +20,7 @@ class VirtualKeyboard(tk.Frame):
         ]
 
         for row_keys in kbd_rows:
-            rowf = tk.Frame(self)
+            rowf = tk.Frame(self, bg=THEME["card"])
             rowf.pack(side="top", pady=2)
             for ch in row_keys:
                 b = tk.Button(rowf, text=ch, width=4, height=2,
@@ -26,11 +28,12 @@ class VirtualKeyboard(tk.Frame):
                 b.pack(side="left", padx=1)
 
         # Control row
-        ctrl_row = tk.Frame(self)
+        ctrl_row = tk.Frame(self, bg=THEME["card"])
         ctrl_row.pack(side="top", pady=6)
         tk.Button(ctrl_row, text="Backspace", width=10, command=self.backspace_pressed).pack(side="left", padx=4)
         tk.Button(ctrl_row, text="Space", width=10, command=lambda: self.insert_char(" ")).pack(side="left", padx=4)
         tk.Button(ctrl_row, text="Clear", width=8, command=self.clear_pressed).pack(side="left", padx=4)
+        polish_descendant_buttons(self)
 
 
     def insert_char(self, ch):

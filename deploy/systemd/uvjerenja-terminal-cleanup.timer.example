@@ -1,0 +1,11 @@
+[Unit]
+Description=Uvjerenja Terminal daily cleanup timer
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=5m
+Unit=uvjerenja-terminal-cleanup.service
+
+[Install]
+WantedBy=timers.target

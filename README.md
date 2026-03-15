@@ -1,116 +1,88 @@
-# Automatsko Printanje Školskih Potvrda
+# Uvjerenja Terminal (Raspberry Pi)
 
-**Automatizovani sistem za generisanje i printanje školskih potvrda**, dizajniran da ubrza rad sekretara i smanji manuelni rad sa dokumentima.
+Appliance-style sistem za generisanje i štampanje školskih potvrda (DOCX → PDF → CUPS print), dizajniran da radi **"zero‑touch"**: uključiš Raspberry Pi i aplikacija radi sama.
 
----
+## Instalacija (preporučeno)
 
-## 🎯 Svrha projekta
-
-Sekretar u školi često mora ručno ispisivati potvrde za učenike. Ovaj program:
-
-* Automatizuje **generisanje dokumenata** u PDF formatu
-* Omogućava **instant printanje** na HP printer
-* Ubrzava proces tako da učenici sami mogu preuzeti dokument, a sekretar samo **potpisuje i pečatira**
-
----
-
-## 📝 Glavne funkcionalnosti
-
-1. **Generisanje PDF dokumenata** iz unaprijed definisanih šablona (DOCX → PDF)
-2. **Unos podataka preko Tkinter GUI-a**
-   * Polja: Razred, Struka, Razlog, Ime učenika itd.
-   * Debug mode može automatski popuniti polja sa dummy podacima
-
-3. **Printanje** na HP printer preko CUPS-a (Linux / Raspberry Pi)
-   * Podržava **USB i mrežne printere**
-
-4. **Višestruki ekrani u GUI-u**
-   * Početni tutorijal / upute
-   * Unos podataka
-   * Završetak / potvrda printanja
-
-5. **Konfiguracija i prilagodba**
-   * Dropdown liste i placeholder-i u `config.py`
-   * Admini mogu mijenjati vrijednosti ako se nešto promijeni
-
-6. **Logging i debug**
-   * Svi print jobovi i greške se loguju za lakše praćenje
-
-7. **Validacija imena učenika** i drugih polja (u planu za buduće verzije)
-
----
-
-## 🛠️ Tehnički zahtjevi
-
-### Python paketi
-
-`requirements.txt`:
-
-```
-pycups
-python-docx
-```
-
-### Linux / Raspberry Pi sistemski paketi
+Na Raspberry Pi OS (Desktop/X11):
 
 ```bash
-sudo apt update
-sudo apt install -y python3-tk libreoffice hplip printer-driver-hpcups
+chmod +x install_uvjerenja_terminal.sh
+./install_uvjerenja_terminal.sh
 ```
 
-* **CUPS** – za printanje PDF-a
-* **HPLIP** – HP driveri
-* **LibreOffice** – konverzija DOCX → PDF
+Skripta radi:
+- instalira sistemske pakete (Tkinter, CUPS, LibreOffice headless, HP driveri)
+- deploy koda u `/opt/uvjerenja-terminal/src` i venv u `/opt/uvjerenja-terminal/venv`
+- kreira config u `/etc/uvjerenja-terminal/uvjerenja-terminal.env`
+- kreira job queue/output u `/var/lib/uvjerenja-terminal/jobs`
+- instalira i starta systemd servis `uvjerenja-terminal.service`
+- (opciono) pokreće touchscreen kalibraciju (X11)
 
----
-
-## ⚙️ Konfiguracija
-
-Sve liste i placeholderi su u `config.py`:
-
-```python
-RAZREDI = ["ПРВИ", "ДРУГИ", "ТРЕЋИ", "ЧЕТВРТИ"]
-STRUKE = ["МАШИНСТВО И ОБРАДА МЕТАЛА", "ЕКОНОМИЈА", "ЕЛЕКТРОТЕХНИКА"]
-RAZGOVORI = ["УЧЛАЊЕЊА У ОМЛАДИНСКУ ЗАДРУГУ", "ПРЕПИС СВЈЕДОЧАНСТВА", "ПОТВРДА О СТАТУСУ"]
-```
-
-Admini mogu mijenjati ove liste ako se pravila promijene.
-
----
-
-## 🚀 Korištenje
-
-### 1. Pokretanje GUI-a
+### Logovi
 
 ```bash
-python main.py
+sudo journalctl -u uvjerenja-terminal.service -f
 ```
 
-* Prikazuje tutorijal
-* Zatim unos podataka
-* Na kraju potvrda i print
+### Konfiguracija
 
-### 2. Printanje dokumenta
-
-```python
-from print_subprocess import print_docx
-
-success = print_docx("template.docx", printer="HP_OfficeJet")
-if success:
-    print("Print job completed successfully")
-else:
-    print("Print job failed")
+```bash
+sudo nano /etc/uvjerenja-terminal/uvjerenja-terminal.env
+sudo systemctl restart uvjerenja-terminal.service
 ```
 
----
+Najvažnije varijable:
+- `POTVRDE_PRINTER_NAME` (CUPS queue name)
+- `POTVRDE_DJELOVODNI_BROJ` (seed/start value for the internal counter)
+- `POTVRDE_VAR_DIR` (default `/var/lib/uvjerenja-terminal`)
+- `POTVRDE_TEMPLATE_PATH` (default `project/docs/template.docx`)
 
-## 🧩 Debugging
+## Pokretanje (dev)
 
-* Uključivanjem **debug mode** polja se popunjavaju dummy podacima
-* Logovi se čuvaju u `logs/` folderu
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python -m project.core.app
+```
+
+## Struktura (bitno)
+
+- `project/gui/` – Tkinter UI (Start → Form → Review → Printing → Done)
+- `project/services/print_job.py` – backend pipeline (DOCX→PDF→print)
+- `project/core/config.py` – config iz ENV (systemd EnvironmentFile)
+- `project/docs/template.docx` – DOCX template
+
+## Licence
+MIT (vidi `LICENSE`).
 
 
-## License
-This script is provided under the [MIT License](LICENSE).  
+## Napomene o evidenciji i broju
 
-By using this script, you agree to comply with all applicable laws and regulations and use it only for lawful, ethical purposes.
+- `POTVRDE_DJELOVODNI_BROJ` se sada koristi kao **početna seed vrijednost** za brojač u bazi.
+- Prvi stvarni dokument dobija **sljedeći** broj nakon seed vrijednosti.
+- Retry koristi isti `job_id` i isti djelovodni broj; samo se povećava `attempt_no`.
+- `Escape` izlaz je dozvoljen samo kada je `POTVRDE_DEBUG_MODE=1`.
+
+
+## Touchscreen setup alati
+
+- `instructions/setup-wizard.md`
+- `instructions/network-wifi-touch-setup.md`
+- `instructions/network-printer-setup.md`
+- `instructions/raspberry-pi-image-checklist.md`
+
+
+## Dodatne instrukcije
+- `instructions/template-validation.md`
+- `instructions/prebuilt-image-runbook.md`
+
+
+## Finalni deployment i image workflow
+
+- `scripts/first_boot_finalize.sh`
+- `scripts/build_prebuilt_release_bundle.sh`
+- `scripts/prepare_image_for_clone.sh`
+- `instructions/prebuilt-image-factory-flow.md`
+- `instructions/final-ui-theme-pass.md`

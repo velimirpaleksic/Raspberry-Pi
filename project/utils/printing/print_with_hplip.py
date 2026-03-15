@@ -2,11 +2,11 @@
 import os
 import subprocess
 
-from project.utils.logging_utils import error_logging
+from project.utils.logging_utils import log_error
 from project.core.config import SUBPROCESS_TIMEOUT, PRINTER_NAME
 
 
-def print_with_hplip(file_path: str) -> bool:
+def print_with_hplip(file_path: str, *, printer_name: str | None = None) -> bool:
     """
     Send a file to HP printer using CUPS' lp command.
     Works on all Linux systems where hp-testpage succeeds.
@@ -14,14 +14,15 @@ def print_with_hplip(file_path: str) -> bool:
     try:
         # Sanity check
         if not file_path:
-            error_logging("print_with_hplip called with empty file path")
+            log_error("print_with_hplip called with empty file path")
             return False
 
         if not os.path.exists(file_path):
-            error_logging(f"Print failed - file not found: {file_path}")
+            log_error(f"Print failed - file not found: {file_path}")
             return False
 
-        cmd = ["lp", "-d", PRINTER_NAME, "-o", "fit-to-page", file_path]
+        target_printer = (printer_name or PRINTER_NAME).strip()
+        cmd = ["lp", "-d", target_printer, "-o", "fit-to-page", file_path]
 
         proc = subprocess.run(
             cmd,
@@ -38,8 +39,8 @@ def print_with_hplip(file_path: str) -> bool:
         return True
 
     except subprocess.CalledProcessError as e:
-        error_logging(f"Print command failed: {e.stderr.strip()}")
+        log_error(f"Print command failed: {e.stderr.strip()}")
         return False
     except Exception as e:
-        error_logging(f"Unexpected error while printing: {e}")
+        log_error(f"Unexpected error while printing: {e}")
         return False

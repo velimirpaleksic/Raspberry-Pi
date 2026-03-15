@@ -1,43 +1,100 @@
-# core/config.py
+"""Runtime configuration.
+
+This project is designed to run on Raspberry Pi (Linux) as an appliance-style
+"terminal". Configuration is primarily driven through environment variables
+loaded by systemd (EnvironmentFile).
+
+Key env vars (see install_uvjerenja_terminal.sh):
+  - POTVRDE_APP_ID
+  - POTVRDE_APP_TITLE
+  - POTVRDE_PRINTER_NAME
+  - POTVRDE_DJELOVODNI_BROJ
+  - POTVRDE_VAR_DIR
+  - POTVRDE_TEMPLATE_PATH
+  - POTVRDE_DEBUG_MODE
+"""
+
+from __future__ import annotations
+
 import datetime
-import uuid
+import os
 from pathlib import Path
 
+
+def _env(name: str, default: str = "") -> str:
+    v = os.getenv(name)
+    return v if v is not None and v != "" else default
+
+
+def _env_int(name: str, default: int) -> int:
+    v = os.getenv(name)
+    if v is None or v.strip() == "":
+        return default
+    try:
+        return int(v)
+    except Exception:
+        return default
+
+
+APP_ID = _env("POTVRDE_APP_ID", "uvjerenja-terminal")
+APP_TITLE = _env("POTVRDE_APP_TITLE", "Uvjerenja Terminal")
+
 # =========================
-# Project root
+# Project root (code)
 # =========================
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# =========================
-# Djelovodni broj
-# =========================
-DJELOVODNI_BROJ = "01-743/25"
+
+def _ensure_dir(p: Path) -> Path:
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+    except Exception:
+        # Fallback into project folder (dev mode)
+        fallback = PROJECT_ROOT / "var" / p.name
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback
+
 
 # =========================
-# Printer
+# Persisted runtime data
 # =========================
-PRINTER_NAME = "Printer_Name"
+VAR_DIR = Path(_env("POTVRDE_VAR_DIR", f"/var/lib/{APP_ID}"))
+VAR_DIR = _ensure_dir(VAR_DIR)
+
+JOBS_DIR = _ensure_dir(VAR_DIR / "jobs")
+EXPORTS_DIR = _ensure_dir(VAR_DIR / "exports")
+
 
 # =========================
-# Template & print queue
+# Business configuration
 # =========================
-TEMPLATE_FILE = PROJECT_ROOT / "docs" / "template.docx"
+DJELOVODNI_BROJ_SEED = _env("POTVRDE_DJELOVODNI_BROJ", "01-743/25")
+DEFAULT_YEAR_MODE = _env("POTVRDE_YEAR_MODE", "auto")
+DEFAULT_MANUAL_YEAR = _env_int("POTVRDE_MANUAL_YEAR", datetime.datetime.now().year)
+DEFAULT_ADMIN_PIN = _env("POTVRDE_ADMIN_PIN", "1234")
+PRINTER_NAME = _env("POTVRDE_PRINTER_NAME", "Printer_Name")
 
-PRINT_QUEUE_DIR = PROJECT_ROOT / "print_queue"
-PRINT_QUEUE_DIR.mkdir(exist_ok=True)
 
-OUTPUT_FILE = PRINT_QUEUE_DIR / f"{uuid.uuid4()}.docx"
+# =========================
+# Template
+# =========================
+TEMPLATE_FILE = Path(_env("POTVRDE_TEMPLATE_PATH", str(PROJECT_ROOT / "docs" / "template.docx")))
+
 
 # =========================
 # Date
 # =========================
-DANASNJI_DATUM = datetime.datetime.now().strftime("%d.%m.%Y")
+def danasnji_datum() -> str:
+    return datetime.datetime.now().strftime("%d.%m.%Y")
+
 
 # =========================
 # Placeholder examples
 # =========================
 MJESTO_PLACEHOLDER = "нпр. Касиндо"
 OPSTINA_PLACEHOLDER = "нпр. Источна Илиџа"
+
 
 # =========================
 # Classes, Professions, Reasons
@@ -55,10 +112,12 @@ RAZLOZI = [
     "ПОТВРДА О СТАТУСУ",
 ]
 
+
 # =========================
 # Debug
 # =========================
-DEBUG_MODE = True
+DEBUG_MODE = _env("POTVRDE_DEBUG_MODE", "0") in ("1", "true", "TRUE", "yes", "YES")
+ALLOW_ESCAPE_EXIT = DEBUG_MODE
 DEBUG_DATA = {
     "IME": "Велимир Палексић",
     "RODITELJ": "Велимир",
@@ -72,37 +131,36 @@ DEBUG_DATA = {
     "RAZLOG": "ПРЕПИС СВЈЕДОЧАНСТВА",
 }
 
+
 # =========================
 # Audit log database
 # =========================
-DB_DIR = PROJECT_ROOT / "db"
-DB_DIR.mkdir(exist_ok=True)
+DB_DIR = _ensure_dir(VAR_DIR / "db")
 DB_PATH = DB_DIR / "audit_log.db"
-DB_SETUP_SCRIPT = DB_DIR / "db.py"
 
-# Space estimates
-# Per entry bytes = 410
-# Entries per MB = 2557
-# Entries per GB = 2618882
+MAX_ENTRIES = 10_475_529  # ~4GB max entries
+BATCH_DELETE_SIZE = 1000
 
-# If you want to change this
-# You can use space_estimator.py script from admin/ folder
-
-MAX_ENTRIES = 10475529 # ~4GB max entries
-BATCH_DELETE_SIZE = 1000  # rows to delete per batch
 
 # =========================
 # Timeouts (seconds)
 # =========================
-SUBPROCESS_TIMEOUT = 60
-DOCX_CONVERT_TIMEOUT = 45
-PRINT_TIMEOUT = 30
+SUBPROCESS_TIMEOUT = _env_int("POTVRDE_SUBPROCESS_TIMEOUT", 60)
+DOCX_CONVERT_TIMEOUT = _env_int("POTVRDE_DOCX_CONVERT_TIMEOUT", 45)
+PRINT_TIMEOUT = _env_int("POTVRDE_PRINT_TIMEOUT", 30)
+
+
+# =========================
+# UX settings
+# =========================
+IDLE_TIMEOUT_MS = _env_int("POTVRDE_IDLE_TIMEOUT_MS", 60_000)
+
+MAINTENANCE_SUMMARY_HOUR = _env_int("POTVRDE_MAINTENANCE_SUMMARY_HOUR", 6)
+
 
 # =========================
 # Logging settings
 # =========================
-ERROR_LOG_DIR = PROJECT_ROOT / "error_logs"
-ERROR_LOG_DIR.mkdir(exist_ok=True)
-
-ERROR_LOG_FILENAME = ERROR_LOG_DIR / datetime.datetime.now().strftime("error_%d.%m.%Y_%H-%M.log")
-LOG_RETENTION_DAYS = 90  # delete old logs
+ERROR_LOG_DIR = _ensure_dir(VAR_DIR / "logs")
+ERROR_LOG_FILE = ERROR_LOG_DIR / datetime.datetime.now().strftime("error_%d.%m.%Y_%H-%M.log")
+LOG_RETENTION_DAYS = 90

@@ -1,0 +1,14 @@
+[Unit]
+Description=Uvjerenja Terminal daily cleanup
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+Group=pi
+WorkingDirectory=/opt/uvjerenja-terminal/src
+EnvironmentFile=/etc/uvjerenja-terminal/uvjerenja-terminal.env
+Environment=APP_ROOT=/opt/uvjerenja-terminal/src
+Environment=PYTHON_BIN=/opt/uvjerenja-terminal/venv/bin/python
+ExecStart=/usr/bin/env bash /opt/uvjerenja-terminal/src/scripts/maintenance_daily.sh

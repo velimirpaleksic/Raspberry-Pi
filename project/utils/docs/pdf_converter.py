@@ -1,6 +1,9 @@
 # utils/docs/pdf_converter.py
 import os
+import shutil
 import subprocess
+
+from project.core.config import DOCX_CONVERT_TIMEOUT
 
 
 def convert_docx_to_pdf(docx_path, output_dir=None):
@@ -12,13 +15,26 @@ def convert_docx_to_pdf(docx_path, output_dir=None):
         output_dir = os.path.dirname(docx_path)
     os.makedirs(output_dir, exist_ok=True)
 
+    lo_bin = shutil.which("libreoffice") or shutil.which("soffice")
+    if not lo_bin:
+        raise RuntimeError("LibreOffice is not installed (missing 'libreoffice'/'soffice')")
+
     cmd = [
-        "libreoffice", "--headless",
+        lo_bin,
+        "--headless",
+        "--nologo",
+        "--nofirststartwizard",
         "--convert-to", "pdf",
         "--outdir", output_dir,
-        docx_path
+        docx_path,
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=DOCX_CONVERT_TIMEOUT,
+    )
     if result.returncode != 0:
         raise RuntimeError(f"Conversion failed: {result.stderr}")
 

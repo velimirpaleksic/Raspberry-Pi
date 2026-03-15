@@ -2,7 +2,7 @@
 import shutil
 from pathlib import Path
 
-from project.utils.logging_utils import error_logging
+from project.utils.logging_utils import log_error
 
 
 def safe_remove_file(path):
@@ -16,7 +16,7 @@ def safe_remove_file(path):
             path.unlink()
 
     except Exception as e:
-        error_logging(f"[File Utils] Failed to delete file '{path}': {e}")
+        log_error(f"[File Utils] Failed to delete file '{path}': {e}")
 
 
 def safe_remove_dir(path, recursive=False):
@@ -33,4 +33,4 @@ def safe_remove_dir(path, recursive=False):
                 path.rmdir()
 
     except Exception as e:
-        error_logging(f"[File Utils] Failed to delete directory '{path}': {e}")
+        log_error(f"[File Utils] Failed to delete directory '{path}': {e}")

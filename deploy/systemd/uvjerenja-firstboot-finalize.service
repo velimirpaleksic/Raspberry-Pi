@@ -1,0 +1,15 @@
+[Unit]
+Description=Uvjerenja Terminal First Boot Finalize
+After=graphical.target network-online.target cups.service
+Wants=network-online.target cups.service
+ConditionPathExists=!/var/lib/uvjerenja-terminal/firstboot/complete.flag
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/uvjerenja-terminal
+WorkingDirectory=/opt/uvjerenja-terminal
+ExecStart=/bin/bash /opt/uvjerenja-terminal/scripts/first_boot_finalize.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=graphical.target

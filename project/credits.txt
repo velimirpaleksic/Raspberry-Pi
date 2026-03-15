@@ -1,0 +1,27 @@
+CREDITS
+
+Projekat: Automatizovani sistem za generisanje i štampanje školskih potvrda
+Platforma: Raspberry Pi
+
+Autor:
+Velimir Paleksić - glavni razvojni programer
+• Razvoj kompletne aplikacione logike
+• Implementacija GUI sistema (Tkinter)
+• Integracija print modula (CUPS)
+• Generisanje PDF dokumenata i rad sa šablonima (libreoffice)
+• Konfiguracija, logging, testiranje i dokumentacija
+
+Projekat realizovan u okviru grupnog rada učenika razreda
+II-3 (Mašinstvo i obrada metala)
+Srednja škola "28. jun" Istočno Sarajevo
+
+Članovi grupe (doprinos u testiranju i dokumentaciji):
+- 
+- 
+- i ostali učenici razreda II-3
+
+Izvorni kod aplikacije:
+https://github.com/velimirpaleksic/Raspberry-Pi
+
+Licenca: MIT
+Godina: 2025

@@ -1,0 +1,16 @@
+[Unit]
+Description=Uvjerenja Terminal Telegram Remote Poll Loop
+After=network-online.target uvjerenja-terminal.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/uvjerenja-terminal
+ExecStart=/opt/uvjerenja-terminal/scripts/telegram_remote_poll_loop.sh
+Restart=always
+RestartSec=5
+User=pi
+Group=pi
+
+[Install]
+WantedBy=multi-user.target

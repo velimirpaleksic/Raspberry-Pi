@@ -2,7 +2,7 @@
 from project.db.db_init import initialize_database
 from project.db.db_connection import get_connection
 
-from project.utils.logging_utils import error_logging
+from project.utils.logging_utils import log_error
 
 
 def insert_entry(
@@ -44,7 +44,7 @@ def insert_entry(
         print("[DB] New entry successfully added.")
 
     except Exception as e:
-        error_logging(f"[DB] Failed to insert entry: {e}")
+        log_error(f"[DB] Failed to insert entry: {e}")
         raise
 
 

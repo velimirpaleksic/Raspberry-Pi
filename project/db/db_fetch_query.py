@@ -2,7 +2,7 @@
 from project.db.db_connection import get_connection
 from project.db.db_init import initialize_database
 
-from project.utils.logging_utils import error_logging
+from project.utils.logging_utils import log_error
 
 
 def fetch_all_entries():
@@ -25,7 +25,7 @@ def fetch_all_entries():
             return results
 
     except Exception as e:
-        error_logging(f"[DB] Could not fetch all entries: {e}")
+        log_error(f"[DB] Could not fetch all entries: {e}")
         return []
 
 
@@ -52,7 +52,7 @@ def fetch_entry_by_id(entry_id: int):
             return result
 
     except Exception as e:
-        error_logging(f"[DB] Could not fetch entry {entry_id}: {e}")
+        log_error(f"[DB] Could not fetch entry {entry_id}: {e}")
         return None
 
 
@@ -72,7 +72,7 @@ def fetch_entries_by_field(field: str, value: str):
     # Validate input - never directly interpolate user input into SQL
     allowed_fields = {"ime", "roditelj", "mjesto", "opstina", "razred", "struka", "razlog"}
     if field not in allowed_fields:
-        error_logging(f"[DB] Invalid field name: {field}")
+        log_error(f"[DB] Invalid field name: {field}")
         return []
 
     try:
@@ -83,5 +83,5 @@ def fetch_entries_by_field(field: str, value: str):
             return results
 
     except Exception as e:
-        error_logging(f"[DB] Could not fetch by field '{field}': {e}")
+        log_error(f"[DB] Could not fetch by field '{field}': {e}")
         return []
