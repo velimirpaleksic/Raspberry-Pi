@@ -58,7 +58,7 @@ def log_error(message: str) -> None:
     try:
         from project.services.telegram_notify import notify_telegram_async
 
-        notify_telegram_async("Uvjerenja Terminal error:\n" + text[:3200])
+        notify_telegram_async("Uvjerenja Terminal error:\n" + text[:3200], kind="error")
     except Exception:
         pass
 

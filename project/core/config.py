@@ -70,6 +70,19 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    """Read a boolean env flag with a real default.
+
+    Missing or empty values use the default, so notification flags can stay
+    enabled even when the deploy environment does not define them. Explicit
+    false values like 0/false/no/off still disable the flag intentionally.
+    """
+    v = os.getenv(name)
+    if v is None or v.strip() == "":
+        return default
+    return v.strip().lower() in ("1", "true", "yes", "y", "on")
+
+
 APP_ID = _env("POTVRDE_APP_ID", "uvjerenja-terminal")
 APP_TITLE = _env("POTVRDE_APP_TITLE", "Uvjerenja Terminal")
 
@@ -126,7 +139,7 @@ RAZLOZI = [
 ]
 
 # Keep debug data off by default on the kiosk.
-DEBUG_MODE = _env("POTVRDE_DEBUG_MODE", "0") in ("1", "true", "TRUE", "yes", "YES")
+DEBUG_MODE = _env_bool("POTVRDE_DEBUG_MODE", False)
 DEBUG_DATA = {
     "IME": "",
     "PREZIME": "",
@@ -150,10 +163,14 @@ PRINTER_CHECK_RETRY_DELAY_SECONDS = _env_int("POTVRDE_PRINTER_CHECK_RETRY_DELAY_
 PRINT_RETRY_ATTEMPTS = _env_int("POTVRDE_PRINT_RETRY_ATTEMPTS", 3)
 PRINT_RETRY_DELAY_SECONDS = _env_int("POTVRDE_PRINT_RETRY_DELAY_SECONDS", 3)
 
-TELEGRAM_ENABLED = _env("POTVRDE_TELEGRAM_ENABLED", "1") in ("1", "true", "TRUE", "yes", "YES")
+TELEGRAM_ENABLED = _env_bool("POTVRDE_TELEGRAM_ENABLED", True)
 TELEGRAM_BOT_TOKEN = _env("POTVRDE_TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_ALLOWED_USER_ID = _env_int("POTVRDE_TELEGRAM_ALLOWED_USER_ID", 6598155929)
-TELEGRAM_ERROR_NOTIFICATIONS = _env("POTVRDE_TELEGRAM_ERROR_NOTIFICATIONS", "1") in ("1", "true", "TRUE", "yes", "YES")
+TELEGRAM_ERROR_NOTIFICATIONS = _env_bool("POTVRDE_TELEGRAM_ERROR_NOTIFICATIONS", True)
+TELEGRAM_STATUS_NOTIFICATIONS = _env_bool("POTVRDE_TELEGRAM_STATUS_NOTIFICATIONS", True)
+TELEGRAM_NOTIFY_ONLINE = _env_bool("POTVRDE_TELEGRAM_NOTIFY_ONLINE", True)
+TELEGRAM_NOTIFY_PRINT_JOBS = _env_bool("POTVRDE_TELEGRAM_NOTIFY_PRINT_JOBS", True)
+TELEGRAM_NOTIFY_UPDATE_EVENTS = _env_bool("POTVRDE_TELEGRAM_NOTIFY_UPDATE_EVENTS", True)
 TELEGRAM_ERROR_COOLDOWN_SECONDS = _env_int("POTVRDE_TELEGRAM_ERROR_COOLDOWN_SECONDS", 60)
 TELEGRAM_POLL_TIMEOUT = _env_int("POTVRDE_TELEGRAM_POLL_TIMEOUT", 25)
 TELEGRAM_POLL_BACKOFF_MAX_SECONDS = _env_int("POTVRDE_TELEGRAM_POLL_BACKOFF_MAX_SECONDS", 60)
@@ -162,7 +179,7 @@ TELEGRAM_SEND_RETRY_DELAY_SECONDS = _env_int("POTVRDE_TELEGRAM_SEND_RETRY_DELAY_
 TELEGRAM_COMMAND_TIMEOUT = _env_int("POTVRDE_TELEGRAM_COMMAND_TIMEOUT", 900)
 TELEGRAM_REBOOT_COMMAND = _env("POTVRDE_REBOOT_COMMAND", "sudo -n shutdown -r now")
 TELEGRAM_UPDATE_COMMAND = _env("POTVRDE_UPDATE_COMMAND", "")
-TELEGRAM_RELAUNCH_AFTER_UPDATE = _env("POTVRDE_RELAUNCH_AFTER_UPDATE", "1") in ("1", "true", "TRUE", "yes", "YES")
+TELEGRAM_RELAUNCH_AFTER_UPDATE = _env_bool("POTVRDE_RELAUNCH_AFTER_UPDATE", True)
 TELEGRAM_RELAUNCH_COMMAND = _env("POTVRDE_RELAUNCH_COMMAND", f"/usr/local/bin/{APP_ID}-run")
 NETWORK_CHECK_HOST = _env("POTVRDE_NETWORK_CHECK_HOST", "api.telegram.org")
 NETWORK_CHECK_PORT = _env_int("POTVRDE_NETWORK_CHECK_PORT", 443)

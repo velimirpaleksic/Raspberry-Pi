@@ -6,6 +6,7 @@ import threading
 import time
 import urllib.parse
 import urllib.request
+from typing import Literal
 
 from project.core import config
 
@@ -19,20 +20,29 @@ PLACEHOLDER_TOKENS = {
     "YOUR_TELEGRAM_BOT_TOKEN_HERE",
 }
 
+NotificationKind = Literal["status", "error"]
 
-def _can_notify() -> bool:
+
+def _base_can_notify() -> bool:
     token = config.TELEGRAM_BOT_TOKEN.strip()
     return (
         config.TELEGRAM_ENABLED
-        and config.TELEGRAM_ERROR_NOTIFICATIONS
         and token not in PLACEHOLDER_TOKENS
         and ":" in token
         and config.TELEGRAM_ALLOWED_USER_ID > 0
     )
 
 
-def _send_message(text: str) -> None:
-    if not _can_notify():
+def _can_notify(kind: NotificationKind = "status") -> bool:
+    if not _base_can_notify():
+        return False
+    if kind == "error":
+        return config.TELEGRAM_ERROR_NOTIFICATIONS
+    return config.TELEGRAM_STATUS_NOTIFICATIONS
+
+
+def _send_message(text: str, *, kind: NotificationKind = "status") -> None:
+    if not _can_notify(kind):
         return
 
     token = config.TELEGRAM_BOT_TOKEN.strip()
@@ -51,14 +61,14 @@ def _send_message(text: str) -> None:
         raise RuntimeError(result.get("description") or "Telegram notification failed.")
 
 
-def _send_message_with_retries(text: str) -> None:
+def _send_message_with_retries(text: str, *, kind: NotificationKind = "status") -> None:
     attempts = max(1, config.TELEGRAM_SEND_RETRY_ATTEMPTS)
     delay = max(0, config.TELEGRAM_SEND_RETRY_DELAY_SECONDS)
     last_exc: Exception | None = None
 
     for attempt in range(1, attempts + 1):
         try:
-            _send_message(text)
+            _send_message(text, kind=kind)
             return
         except Exception as exc:
             last_exc = exc
@@ -69,14 +79,14 @@ def _send_message_with_retries(text: str) -> None:
         raise last_exc
 
 
-def notify_telegram_async(text: str) -> None:
-    if not _can_notify():
+def notify_telegram_async(text: str, *, kind: NotificationKind = "status") -> None:
+    if not _can_notify(kind):
         return
 
     def worker() -> None:
         try:
-            _send_message_with_retries(text)
+            _send_message_with_retries(text, kind=kind)
         except Exception as exc:
             logger.error("[Telegram] Notification failed: %s", exc)
 
-    threading.Thread(target=worker, name="telegram-notify", daemon=True).start()
+    threading.Thread(target=worker, name=f"telegram-notify-{kind}", daemon=True).start()

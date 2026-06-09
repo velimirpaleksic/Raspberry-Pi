@@ -1,5 +1,6 @@
 import datetime
 import json
+import socket
 import subprocess
 import time
 import uuid
@@ -82,7 +83,40 @@ def _notify_job_failure(
     if detail:
         details.append(f"Detail: {str(detail)[:1500]}")
 
-    notify_telegram_async("\n".join(details))
+    notify_telegram_async("\n".join(details), kind="error")
+
+
+def _notify_job_success(job_id: str, payload: Dict) -> None:
+    if not config.TELEGRAM_NOTIFY_PRINT_JOBS:
+        return
+
+    form_data = payload.get("form_data") or {}
+    lines = [
+        "Uvjerenja Terminal print job completed.",
+        f"Job: {job_id}",
+        f"Time: {datetime.datetime.now().strftime('%d.%m.%Y %H:%M:%S')}",
+        f"Host: {socket.gethostname()}",
+    ]
+
+    full_name = str(form_data.get("ime") or "").strip()
+    if full_name:
+        lines.append(f"Student: {full_name}")
+    razred = str(form_data.get("razred") or "").strip()
+    if razred:
+        lines.append(f"Razred: {razred}")
+    razlog = str(form_data.get("razlog") or "").strip()
+    if razlog:
+        lines.append(f"Razlog: {razlog}")
+
+    printer_name = str(payload.get("printer_name") or payload.get("resolved_printer") or "").strip()
+    if printer_name:
+        lines.append(f"Printer: {printer_name}")
+    if payload.get("pdf_path"):
+        lines.append(f"PDF: {payload.get('pdf_path')}")
+    if payload.get("docx_path"):
+        lines.append(f"DOCX: {payload.get('docx_path')}")
+
+    notify_telegram_async("\n".join(lines), kind="status")
 
 
 def _fail(job_dir: Path, payload: Dict, job_id: str, error_code: str, user_message: str, detail: str = "", *, docx_path: str | None = None, pdf_path: str | None = None) -> PrintResult:
@@ -152,7 +186,7 @@ def _notify_printer_error(
         details.append(f"Resolved printer: {resolved_printer}")
     if attempts:
         details.append(f"Attempts: {attempts}")
-    notify_telegram_async("\n".join(details))
+    notify_telegram_async("\n".join(details), kind="status")
 
 
 def _resolve_ready_printer_for_job() -> tuple[bool, str, str, str, str, int]:
@@ -306,6 +340,7 @@ def run_print_job(
             }
         )
         _write_job_json(job_dir, payload)
+        _notify_job_success(job_id, payload)
         return PrintResult(True, job_id, docx_path=str(output_docx), pdf_path=str(pdf_path))
     except FileNotFoundError as e:
         log_error(f"[JOB] {job_id} file missing: {e}")

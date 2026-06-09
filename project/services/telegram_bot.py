@@ -4,6 +4,7 @@ import json
 import os
 import shlex
 import shutil
+import socket
 import subprocess
 import sys
 import threading
@@ -56,6 +57,10 @@ class TelegramControlBot:
             return
         self._thread = threading.Thread(target=self._run, name="telegram-control-bot", daemon=True)
         self._thread.start()
+        if config.TELEGRAM_NOTIFY_ONLINE and config.TELEGRAM_STATUS_NOTIFICATIONS:
+            notify_timer = threading.Timer(2.0, self._notify_online)
+            notify_timer.daemon = True
+            notify_timer.start()
 
     def stop(self) -> None:
         self._stop_event.set()
@@ -206,6 +211,39 @@ class TelegramControlBot:
                 ]
             ),
         )
+
+    def _notify_online(self) -> None:
+        """Send a best-effort startup/online message without blocking app launch."""
+        try:
+            storage = self._collect_storage_diagnostics()
+            network = collect_network_diagnostics()
+            printer = collect_printer_diagnostics(get_selected_printer())
+            hidden = False
+            try:
+                hidden = bool(self.manager.is_kiosk_hidden()) if self.manager is not None else False
+            except Exception:
+                hidden = False
+
+            lines = [
+                "Uvjerenja Terminal is online.",
+                f"Time: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}",
+                f"Host: {socket.gethostname()}",
+                f"Kiosk window: {'hidden' if hidden else 'visible'}",
+                f"Internet: {'yes' if network.get('internet') else 'no'} - {network.get('internet_message')}",
+                f"SSID: {network.get('ssid') or '(unknown)'}",
+                f"IP: {network.get('ip') or '(unknown)'}",
+                f"Disk free /: {storage.get('root_free')} of {storage.get('root_total')} ({storage.get('root_used_percent')} used)",
+                f"App data free: {storage.get('var_free')} of {storage.get('var_total')} ({storage.get('var_used_percent')} used)",
+                f"App printer: {printer.get('preferred') or '(uses CUPS default)'}",
+                f"CUPS default: {printer.get('default') or '(not set)'}",
+                f"Resolved printer: {printer.get('resolved') or '(not resolved)'}",
+                f"Printer ready: {'yes' if printer.get('ready') else 'no'}",
+            ]
+            if not printer.get("ready"):
+                lines.append(f"Printer reason: {printer.get('ready_message') or printer.get('detect_message') or 'unknown'}")
+            self._send_message(self.allowed_user_id, "\n".join(lines))
+        except Exception as exc:
+            log_error(f"[Telegram] online notification failed: {exc}")
 
     def _send_printer_status(self, chat_id: int | str | None) -> None:
         selected = get_selected_printer()
@@ -514,23 +552,41 @@ class TelegramControlBot:
             True,
             "Ažuriranje je u toku. Molimo ne dirajte ekran, tastaturu ili miš.",
         )
-        self._send_message(chat_id, "Update command received. Inputs are locked while the project updates.")
+        started_at = time.time()
+        self._send_message(
+            chat_id,
+            "Update started. Inputs are locked while the project updates. "
+            "If this fails, inputs will be unlocked automatically.",
+        )
 
         ok, output = self._run_update()
+        elapsed = int(time.time() - started_at)
         if not ok:
             self._set_update_input_locked(False)
-            self._send_message(chat_id, "Update failed. Inputs are unlocked and the old app is still running.\n\n" + self._tail(output))
+            self._send_message(
+                chat_id,
+                "Update failed. Inputs are unlocked and the old app is still running.\n"
+                f"Elapsed: {elapsed}s\n\n" + self._tail(output),
+            )
             return
+
+        self._send_message(
+            chat_id,
+            "Update command finished successfully.\n"
+            f"Elapsed: {elapsed}s\n"
+            f"Relaunch enabled: {'yes' if config.TELEGRAM_RELAUNCH_AFTER_UPDATE else 'no'}\n\n"
+            + self._tail(output),
+        )
 
         if not config.TELEGRAM_RELAUNCH_AFTER_UPDATE:
             self._set_update_input_locked(False)
             self._send_message(
                 chat_id,
-                "Update completed successfully, but relaunch is disabled. Restart or reopen the app manually.\n\n"
-                + self._tail(output),
+                "Update completed, but relaunch is disabled. Restart or reopen the app manually.",
             )
             return
 
+        self._send_message(chat_id, "Starting the updated kiosk app now.")
         ok, relaunch_output = self._relaunch_updated_app()
         if not ok:
             self._set_update_input_locked(False)
@@ -543,17 +599,21 @@ class TelegramControlBot:
 
         self._send_message(
             chat_id,
-            "Update completed successfully. Opening the new app version now.\n\n" + self._tail(output),
+            "Updated app launch command accepted. Closing the old app now. "
+            "A fresh online message should arrive when the new app starts.\n\n"
+            + self._tail(relaunch_output),
         )
         self._close_current_app_soon()
 
     def _run_update(self) -> tuple[bool, str]:
         if config.TELEGRAM_UPDATE_COMMAND.strip():
-            return self._run_shell_command(
-                config.TELEGRAM_UPDATE_COMMAND,
+            command = config.TELEGRAM_UPDATE_COMMAND.strip()
+            ok, output = self._run_shell_command(
+                command,
                 cwd=config.APP_ROOT,
                 timeout=config.TELEGRAM_COMMAND_TIMEOUT,
             )
+            return ok, f"$ {command}\nCWD: {config.APP_ROOT}\n{output}"
 
         repo_root = self._find_git_root(config.APP_ROOT) or self._find_git_root(Path.cwd())
         if repo_root is None:
