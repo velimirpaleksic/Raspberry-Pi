@@ -164,6 +164,27 @@ class FormScreen(tk.Frame):
         action_frame = tk.Frame(content, bg="#f5f5f5", height=action_h)
         action_frame.grid(row=3, column=0, sticky="nsew")
         action_frame.grid_propagate(False)
+        self.back_to_start_button = tk.Label(
+            action_frame,
+            text="ПОЧЕТАК",
+            font=button_font,
+            fg="white",
+            bg="#8B1D1D",
+            bd=0,
+            cursor="none",
+            takefocus=0,
+        )
+        self.back_to_start_button.place(
+            x=max(18, int(target_w * 0.035)),
+            rely=0.5,
+            anchor="w",
+            width=max(145, int(target_w * 0.18)),
+            height=max(38, action_h - 12),
+        )
+        self.back_to_start_button.bind("<ButtonPress-1>", self._go_back_to_start_from_touch, add=False)
+        self.back_to_start_button.bind("<ButtonRelease-1>", lambda e: self.back_to_start_button.config(bg="#8B1D1D"), add=False)
+        self.back_to_start_button.bind("<Leave>", lambda e: self.back_to_start_button.config(bg="#8B1D1D"), add=False)
+
         self.next_button = tk.Label(
             action_frame,
             text="ДАЉЕ",
@@ -995,6 +1016,22 @@ class FormScreen(tk.Frame):
             self.razlog_var.set(config.DEBUG_DATA["RAZLOG"])
         except Exception as e:
             log_error(f"[UI] Failed to fill debug data: {e}")
+
+
+    def _go_back_to_start_from_touch(self, event=None):
+        """Return to the start screen and wipe any partially entered form data."""
+        try:
+            if hasattr(self, "back_to_start_button"):
+                self.back_to_start_button.config(bg="#8B1D1D")
+            self._reset_form()
+            self._clear_keyboard_active()
+            if self.manager:
+                self.manager.clear_state()
+                self.manager.show_frame(screen_ids.START, force=True)
+        except Exception as e:
+            log_error(f"[UI] Failed to return to start screen: {e}")
+            self.validation_label.config(text="Није могуће вратити се на почетак. Рестартујте апликацију.")
+        return "break"
 
     def _submit_from_touch(self, event=None):
         self.next_button.config(bg="#000000")

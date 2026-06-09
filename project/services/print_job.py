@@ -237,17 +237,20 @@ def run_print_job(
         _write_job_json(job_dir, payload)
         status("BUILD")
         datum_rodjenja = f"{str(form_data['dan']).strip()}.{str(form_data['mjesec']).strip()}.{str(form_data['godina']).strip()}"
+        # The printed DOCX/PDF must use uppercase values for all user-entered
+        # certificate data. Keep job.json/review state unchanged; only the final
+        # document placeholders are transformed here.
         placeholders = {
             "{{DANASNJI_DATUM}}": _now_local_str(),
-            "{{IME}}": form_data["ime_ucenika"],
-            "{{IME_PREZIME}}": form_data["ime"],
-            "{{IME_UCENIKA}}": form_data["ime_ucenika"],
-            "{{PREZIME}}": form_data["prezime"],
-            "{{RODITELJ}}": form_data["roditelj"],
+            "{{IME}}": _docx_caps(form_data["ime"]),
+            "{{IME_PREZIME}}": _docx_caps(form_data["ime"]),
+            "{{IME_UCENIKA}}": _docx_caps(form_data["ime_ucenika"]),
+            "{{PREZIME}}": _docx_caps(form_data["prezime"]),
+            "{{RODITELJ}}": _docx_caps(form_data["roditelj"]),
             "{{DATUM_RODJENJA}}": datum_rodjenja,
-            "{{MJESTO}}": form_data["mjesto"],
-            "{{OPSTINA}}": form_data["opstina"],
-            "{{RAZRED}}": form_data["razred"],
+            "{{MJESTO}}": _docx_caps(form_data["mjesto"]),
+            "{{OPSTINA}}": _docx_caps(form_data["opstina"]),
+            "{{RAZRED}}": _docx_caps(form_data["razred"]),
             "{{STRUKA}}": _docx_caps(form_data["struka"]),
             "{{RAZLOG}}": _docx_caps(form_data["razlog"]),
         }

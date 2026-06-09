@@ -11,11 +11,16 @@ class StartScreen(tk.Frame):
             super().__init__(parent, bg="#000000")
             self.manager = manager
 
-            container = tk.Frame(self, bg="#000000")
+            container = tk.Frame(self, bg="#000000", cursor="none")
             container.pack(expand=True, fill="both")
+            container.bind("<ButtonPress-1>", self._start_from_anywhere, add=True)
+
+            content = tk.Frame(container, bg="#000000", cursor="none")
+            content.place(relx=0.5, rely=0.5, anchor="center")
+            content.bind("<ButtonPress-1>", self._start_from_anywhere, add=True)
 
             start_btn = TouchButton(
-                container,
+                content,
                 text="ЗАПОЧНИ",
                 font=("Arial", 72, "bold"),
                 fg="white",
@@ -23,12 +28,28 @@ class StartScreen(tk.Frame):
                 activebackground="#111111",
                 activeforeground="white",
                 padx=90,
-                pady=34,
+                pady=28,
                 command=self.goto_form,
             )
-            start_btn.pack(expand=True)
+            start_btn.pack(pady=(0, 24))
+
+            disclaimer = tk.Label(
+                content,
+                text="Напомена: Терминал ради у периоду од 08:00 до 15:00,\nу радно вријеме секретаријата.",
+                font=("Arial", 24, "bold"),
+                fg="#f2f2f2",
+                bg="#000000",
+                justify="center",
+                cursor="none",
+            )
+            disclaimer.pack()
+            disclaimer.bind("<ButtonPress-1>", self._start_from_anywhere, add=True)
         except Exception as e:
             log_error(f"Failed to build 'StartScreen' UI elements: {e}")
+
+    def _start_from_anywhere(self, event=None):
+        self.goto_form()
+        return "break"
 
     def on_show(self):
         if self.manager:
