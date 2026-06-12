@@ -18,6 +18,7 @@ from typing import Any
 
 from project.core import config
 from project.core.runtime_settings import clear_selected_printer, get_selected_printer, set_selected_printer
+from project.services.storage_cleanup import collect_storage_report, format_cleanup_summary, format_storage_report, run_cleanup
 from project.utils.logging_utils import log_error, log_info
 from project.utils.network_status import collect_network_diagnostics, reconnect_network
 from project.utils.printing.printer_status import (
@@ -147,6 +148,8 @@ class TelegramControlBot:
             self._send_status(chat_id)
         elif command in ("/space", "/disk", "/storage"):
             self._send_space_status(chat_id)
+        elif command == "/cleanup":
+            self._start_background_command("cleanup", chat_id, self._cleanup_storage)
         elif command in ("/network", "/internet", "/wifi"):
             self._send_network_status(chat_id)
         elif command in ("/reconnectwifi", "/reconnectnetwork"):
@@ -193,6 +196,7 @@ class TelegramControlBot:
                     "/help - show this message",
                     "/status - app, Telegram, disk space, network and printer status",
                     "/space - available Raspberry Pi disk space",
+                    "/cleanup - delete old app-owned generated files/logs safely",
                     "/ping - quick Telegram roundtrip test",
                     "/network - internet/Wi-Fi diagnostics",
                     "/reconnectwifi - reconnect Wi-Fi/network",
@@ -229,6 +233,7 @@ class TelegramControlBot:
                 f"Time: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}",
                 f"Host: {socket.gethostname()}",
                 f"Kiosk window: {'hidden' if hidden else 'visible'}",
+                f"Working hours: {config.working_hours_status_text()}",
                 f"Internet: {'yes' if network.get('internet') else 'no'} - {network.get('internet_message')}",
                 f"SSID: {network.get('ssid') or '(unknown)'}",
                 f"IP: {network.get('ip') or '(unknown)'}",
@@ -284,6 +289,7 @@ class TelegramControlBot:
             "Uvjerenja Terminal status:",
             f"Uptime: {uptime_seconds // 3600}h {(uptime_seconds % 3600) // 60}m",
             f"Kiosk window: {'hidden' if hidden else 'visible'}",
+            f"Working hours: {config.working_hours_status_text()}",
             f"Active command: {self._active_command or 'none'}",
             f"Disk free /: {storage.get('root_free')} of {storage.get('root_total')} ({storage.get('root_used_percent')} used)",
             f"Disk free app data: {storage.get('var_free')} of {storage.get('var_total')} ({storage.get('var_used_percent')} used)",
@@ -364,12 +370,32 @@ class TelegramControlBot:
             "Raspberry Pi disk space:",
             f"/: free {storage.get('root_free')} / total {storage.get('root_total')} / used {storage.get('root_used_percent')}",
             f"App data ({storage.get('var_path')}): free {storage.get('var_free')} / total {storage.get('var_total')} / used {storage.get('var_used_percent')}",
+            f"Alert thresholds: warning {config.STORAGE_ALERT_USED_PERCENT}%, critical {config.STORAGE_CRITICAL_USED_PERCENT}%, min free {config.STORAGE_ALERT_MIN_FREE_MB} MiB",
         ]
         if storage.get("root_error"):
             lines.append(f"Root check error: {storage.get('root_error')}")
         if storage.get("var_error"):
             lines.append(f"App data check error: {storage.get('var_error')}")
         self._send_message(chat_id, "\n".join(lines))
+
+    def _cleanup_storage(self, chat_id: int | str | None) -> None:
+        before = collect_storage_report()
+        result = run_cleanup(pressure=True, include_pycache=True, force=True, reason="telegram-cleanup")
+        after = collect_storage_report()
+        self._send_message(
+            chat_id,
+            "\n".join(
+                [
+                    "Safe app cleanup finished.",
+                    "Before:",
+                    format_storage_report(before),
+                    "Cleanup:",
+                    format_cleanup_summary(result),
+                    "After:",
+                    format_storage_report(after),
+                ]
+            ),
+        )
 
     def _send_network_status(self, chat_id: int | str | None) -> None:
         info = collect_network_diagnostics()

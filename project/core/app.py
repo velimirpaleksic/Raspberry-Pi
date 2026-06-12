@@ -30,9 +30,11 @@ def main() -> int:
         from project.gui.screens.d_review import ReviewScreen
         from project.gui.screens.e_printing import PrintingScreen
         from project.gui.screens.f_done import DoneScreen
+        from project.services.storage_cleanup import start_periodic_cleanup
         from project.services.telegram_bot import start_telegram_control_bot
 
         telegram_bot = None
+        cleanup_service = None
         manager = ScreenManager()
         manager.add_frame(screen_ids.START, StartScreen, manager=manager)
         manager.add_frame(screen_ids.FORM, FormScreen, manager=manager)
@@ -41,9 +43,12 @@ def main() -> int:
         manager.add_frame(screen_ids.DONE, DoneScreen, manager=manager)
         try:
             telegram_bot = start_telegram_control_bot(manager=manager)
+            cleanup_service = start_periodic_cleanup()
             manager.show_frame(screen_ids.START)
             manager.mainloop()
         finally:
+            if cleanup_service is not None:
+                cleanup_service.stop()
             if telegram_bot is not None:
                 telegram_bot.stop()
         return 0

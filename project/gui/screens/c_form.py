@@ -134,7 +134,7 @@ class FormScreen(tk.Frame):
 
         self._build_date_field(card, base_font, label_font, small_label_font).grid(row=1, column=1, padx=7, pady=4, sticky="nsew")
 
-        self.opstina_entry = self._make_entry_field(card, "Општина", self.opstina_var, "opstina", base_font, label_font)
+        self.opstina_entry = self._make_entry_field(card, "Општина рођења", self.opstina_var, "opstina", base_font, label_font)
         self.opstina_entry.master.grid(row=2, column=0, padx=7, pady=4, sticky="nsew")
         add_placeholder(self.opstina_entry, config.OPSTINA_PLACEHOLDER)
 
@@ -238,7 +238,7 @@ class FormScreen(tk.Frame):
             ("Мјесец рођења", self.mjesec_entry),
             ("Дан рођења", self.dan_entry),
             ("Мјесто рођења", self.mjesto_entry),
-            ("Општина", self.opstina_entry),
+            ("Општина рођења", self.opstina_entry),
             ("Разред", self.razred_cb),
             ("Струка", self.struka_cb),
             ("Разлог", self.razlog_cb),
@@ -1087,7 +1087,7 @@ class FormScreen(tk.Frame):
             missing.append("Мјесто рођења")
             invalid_widgets.append(self.mjesto_entry)
         if not opstina or opstina == config.OPSTINA_PLACEHOLDER:
-            missing.append("Општина")
+            missing.append("Општина рођења")
             invalid_widgets.append(self.opstina_entry)
         if not razred:
             missing.append("Разред")

@@ -12,6 +12,7 @@ STATUS_TEXT = {
     "DOCX": "Генеришем DOCX…",
     "PDF": "Чувам PDF…",
     "PRINT": "Шаљем на штампу…",
+    "OUTSIDE_WORKING_HOURS": "Терминал није доступан",
 }
 
 USER_ERROR_TITLE = "ДОШЛО ЈЕ ДО ГРЕШКЕ"
@@ -171,9 +172,14 @@ class PrintingScreen(tk.Frame):
         paths, error codes, stack traces, or printer diagnostics to students.
         """
         self._is_busy = False
-        self.status_label.config(text="Дошло је до грешке")
-        self.error_title.config(text=USER_ERROR_TITLE)
-        self.error_msg.config(text=USER_ERROR_MESSAGE)
+        if result.error_code == "OUTSIDE_WORKING_HOURS":
+            self.status_label.config(text="Радно вријеме је завршено")
+            self.error_title.config(text="ТЕРМИНАЛ НИЈЕ ДОСТУПАН")
+            self.error_msg.config(text=result.user_message or "Терминал тренутно није доступан.")
+        else:
+            self.status_label.config(text="Дошло је до грешке")
+            self.error_title.config(text=USER_ERROR_TITLE)
+            self.error_msg.config(text=USER_ERROR_MESSAGE)
         self.error_detail.config(text="")
         try:
             self.error_detail.pack_forget()

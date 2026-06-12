@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import logging
 import os
 from pathlib import Path
 
@@ -10,6 +11,18 @@ from pathlib import Path
 CONFIG_FILE = Path(__file__).resolve()
 PROJECT_ROOT = CONFIG_FILE.parent.parent
 APP_ROOT = PROJECT_ROOT.parent
+_CONFIG_LOGGER = logging.getLogger("uvjerenja_terminal.config")
+_CONFIG_WARNINGS: set[str] = set()
+
+
+def _warn_config_once(message: str) -> None:
+    if message in _CONFIG_WARNINGS:
+        return
+    _CONFIG_WARNINGS.add(message)
+    try:
+        _CONFIG_LOGGER.warning(message)
+    except Exception:
+        pass
 
 
 def _load_dotenv_file(path: Path) -> None:
@@ -163,6 +176,23 @@ PRINTER_CHECK_RETRY_DELAY_SECONDS = _env_int("POTVRDE_PRINTER_CHECK_RETRY_DELAY_
 PRINT_RETRY_ATTEMPTS = _env_int("POTVRDE_PRINT_RETRY_ATTEMPTS", 3)
 PRINT_RETRY_DELAY_SECONDS = _env_int("POTVRDE_PRINT_RETRY_DELAY_SECONDS", 3)
 
+WORKING_HOURS_ENABLED = _env_bool("POTVRDE_WORKING_HOURS_ENABLED", True)
+WORKING_HOURS_START = _env("POTVRDE_WORKING_HOURS_START", "08:00").strip() or "08:00"
+WORKING_HOURS_END = _env("POTVRDE_WORKING_HOURS_END", "15:00").strip() or "15:00"
+
+CLEANUP_ENABLED = _env_bool("POTVRDE_CLEANUP_ENABLED", True)
+CLEANUP_INTERVAL_MINUTES = _env_int("POTVRDE_CLEANUP_INTERVAL_MINUTES", 30)
+SUCCESSFUL_JOB_DOCUMENT_RETENTION_MINUTES = _env_int("POTVRDE_SUCCESSFUL_JOB_DOCUMENT_RETENTION_MINUTES", 0)
+FAILED_JOB_RETENTION_DAYS = _env_int("POTVRDE_FAILED_JOB_RETENTION_DAYS", 7)
+JOB_JSON_RETENTION_DAYS = _env_int("POTVRDE_JOB_JSON_RETENTION_DAYS", 30)
+
+STORAGE_ALERT_USED_PERCENT = _env_int("POTVRDE_STORAGE_ALERT_USED_PERCENT", 90)
+STORAGE_CRITICAL_USED_PERCENT = _env_int("POTVRDE_STORAGE_CRITICAL_USED_PERCENT", 95)
+STORAGE_ALERT_MIN_FREE_MB = _env_int("POTVRDE_STORAGE_ALERT_MIN_FREE_MB", 512)
+STORAGE_CLEANUP_ON_PRESSURE = _env_bool("POTVRDE_STORAGE_CLEANUP_ON_PRESSURE", True)
+STORAGE_ALERT_COOLDOWN_MINUTES = _env_int("POTVRDE_STORAGE_ALERT_COOLDOWN_MINUTES", 60)
+STORAGE_CHECK_INTERVAL_MINUTES = _env_int("POTVRDE_STORAGE_CHECK_INTERVAL_MINUTES", 30)
+
 TELEGRAM_ENABLED = _env_bool("POTVRDE_TELEGRAM_ENABLED", True)
 TELEGRAM_BOT_TOKEN = _env("POTVRDE_TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_ALLOWED_USER_ID = _env_int("POTVRDE_TELEGRAM_ALLOWED_USER_ID", 6598155929)
@@ -190,7 +220,67 @@ TELEGRAM_LOG_TAIL_LINES = _env_int("POTVRDE_TELEGRAM_LOG_TAIL_LINES", 80)
 
 ERROR_LOG_DIR = _ensure_dir(VAR_DIR / "logs")
 ERROR_LOG_FILE = ERROR_LOG_DIR / datetime.datetime.now().strftime("error_%d.%m.%Y_%H-%M.log")
-LOG_RETENTION_DAYS = 90
+LOG_RETENTION_DAYS = _env_int("POTVRDE_LOG_RETENTION_DAYS", 90)
+
+
+def _parse_hhmm(value: str, default: str, name: str) -> datetime.time:
+    raw = str(value or "").strip() or default
+    try:
+        hour_text, minute_text = raw.split(":", 1)
+        hour = int(hour_text)
+        minute = int(minute_text)
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            raise ValueError
+        return datetime.time(hour=hour, minute=minute)
+    except Exception:
+        _warn_config_once(f"[Config] Invalid {name}={raw!r}; using {default}.")
+        hour_text, minute_text = default.split(":", 1)
+        return datetime.time(hour=int(hour_text), minute=int(minute_text))
+
+
+def working_hours_bounds() -> tuple[datetime.time, datetime.time]:
+    return (
+        _parse_hhmm(WORKING_HOURS_START, "08:00", "POTVRDE_WORKING_HOURS_START"),
+        _parse_hhmm(WORKING_HOURS_END, "15:00", "POTVRDE_WORKING_HOURS_END"),
+    )
+
+
+def working_hours_window_text() -> str:
+    start, end = working_hours_bounds()
+    return f"{start.strftime('%H:%M')} до {end.strftime('%H:%M')}"
+
+
+def is_within_working_hours(now: datetime.datetime | datetime.time | None = None) -> bool:
+    if not WORKING_HOURS_ENABLED:
+        return True
+
+    start, end = working_hours_bounds()
+    if now is None:
+        current = datetime.datetime.now().time()
+    elif isinstance(now, datetime.datetime):
+        current = now.time()
+    elif isinstance(now, datetime.time):
+        current = now
+    else:
+        _warn_config_once(f"[Config] Unsupported working-hours timestamp {now!r}; using current local time.")
+        current = datetime.datetime.now().time()
+
+    if start == end:
+        _warn_config_once("[Config] Working-hours start and end are equal; treating terminal as available all day.")
+        return True
+    if start < end:
+        return start <= current < end
+    return current >= start or current < end
+
+
+def working_hours_status_text(now: datetime.datetime | datetime.time | None = None) -> str:
+    if not WORKING_HOURS_ENABLED:
+        return "disabled"
+    return f"{'open' if is_within_working_hours(now) else 'closed'} ({working_hours_window_text()})"
+
+
+def working_hours_unavailable_message() -> str:
+    return f"Терминал је доступан од {working_hours_window_text()}, у радно вријеме секретаријата."
 
 
 def configured_printer_missing() -> bool:

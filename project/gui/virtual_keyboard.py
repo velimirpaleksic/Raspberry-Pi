@@ -12,7 +12,15 @@ _KEYBOARD_LOGGER: logging.Logger | None = None
 
 
 def _make_keyboard_log_handler() -> logging.Handler | None:
-    for directory in (Path("/var/lib/uvjerenja-terminal/logs"), Path.cwd() / "var" / "logs"):
+    directories: list[Path] = []
+    try:
+        from project.core import config
+
+        directories.append(config.ERROR_LOG_DIR)
+    except Exception:
+        pass
+    directories.extend([Path("/var/lib/uvjerenja-terminal/logs"), Path.cwd() / "var" / "logs"])
+    for directory in directories:
         try:
             directory.mkdir(parents=True, exist_ok=True)
             handler = RotatingFileHandler(
@@ -405,6 +413,17 @@ class VirtualKeyboard(tk.Frame):
         except Exception:
             return "<unavailable>"
 
+    def _focused_widget_description(self) -> str:
+        try:
+            focused = self.winfo_toplevel().focus_get()
+        except Exception:
+            focused = None
+        if focused is None:
+            return "none"
+        if isinstance(focused, tk.Entry):
+            return self._entry_description(focused)
+        return str(focused)
+
     def _field_key_for_entry(self, entry: tk.Entry) -> str:
         field_key = getattr(entry, "field_key", "")
         if not field_key:
@@ -427,11 +446,12 @@ class VirtualKeyboard(tk.Frame):
         if self._touch_debug:
             state = "accepted" if accepted else f"blocked:{reason or 'unknown'}"
             self._log_debug(
-                "[VK] key=%r mode=%s field=%s before=%r after=%r active_after=%s %s"
+                "[VK] key=%r mode=%s field=%s focused=%s before=%r after=%r active_after=%s %s"
                 % (
                     token,
                     self.mode,
                     self._entry_description(entry_before),
+                    self._focused_widget_description(),
                     value_before,
                     value_after,
                     self._entry_description(self.active_entry),
@@ -464,7 +484,7 @@ class VirtualKeyboard(tk.Frame):
         except Exception:
             pass
 
-        entry_before = self._focused_entry()
+        entry_before = self.active_entry if self._entry_is_usable(self.active_entry) else None
         value_before = self._safe_entry_value(entry_before)
         accepted = False
         reason = ""
@@ -510,6 +530,7 @@ class VirtualKeyboard(tk.Frame):
         if self.active_entry is not None:
             self._log_warning(f"[VK] Stored active entry is unavailable: {self.active_entry}")
             self.active_entry = None
+            return None
         try:
             focused = self.winfo_toplevel().focus_get()
         except Exception:

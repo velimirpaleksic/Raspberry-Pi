@@ -10,6 +10,7 @@ from typing import Callable, Dict, Optional
 
 from project.core import config
 from project.core.runtime_settings import get_selected_printer
+from project.services.storage_cleanup import cleanup_print_job_documents, check_storage_pressure_async, format_bytes
 from project.services.telegram_notify import notify_telegram_async
 from project.utils.docs.docx_replace_placeholders import replace_dynamic_text
 from project.utils.docs.pdf_converter import convert_docx_to_pdf
@@ -33,6 +34,30 @@ class PrintResult:
 
 def _now_local_str() -> str:
     return datetime.datetime.now().strftime("%d.%m.%Y")
+
+
+def _telegram_value(value: object) -> str:
+    text = str(value or "").strip()
+    return text if text else "-"
+
+
+def _telegram_birth_date(form_data: Dict) -> str:
+    dan = str(form_data.get("dan") or "").strip()
+    mjesec = str(form_data.get("mjesec") or "").strip()
+    godina = str(form_data.get("godina") or "").strip()
+    if not (dan and mjesec and godina):
+        return "-"
+    return f"{dan.zfill(2)}.{mjesec.zfill(2)}.{godina}"
+
+
+def _telegram_cleanup_status(payload: Dict) -> str:
+    if payload.get("documents_cleaned"):
+        return "DOCX/PDF обрисани након штампе"
+    if "documents_cleaned" in payload:
+        errors = payload.get("cleanup_errors") or []
+        suffix = f" ({len(errors)} грешка/е)" if errors else ""
+        return f"чишћење покушано, провјерити job.json{suffix}"
+    return "-"
 
 
 def _docx_caps(value: str) -> str:
@@ -91,30 +116,34 @@ def _notify_job_success(job_id: str, payload: Dict) -> None:
         return
 
     form_data = payload.get("form_data") or {}
-    lines = [
-        "Uvjerenja Terminal print job completed.",
-        f"Job: {job_id}",
-        f"Time: {datetime.datetime.now().strftime('%d.%m.%Y %H:%M:%S')}",
-        f"Host: {socket.gethostname()}",
-    ]
-
-    full_name = str(form_data.get("ime") or "").strip()
-    if full_name:
-        lines.append(f"Student: {full_name}")
-    razred = str(form_data.get("razred") or "").strip()
-    if razred:
-        lines.append(f"Razred: {razred}")
-    razlog = str(form_data.get("razlog") or "").strip()
-    if razlog:
-        lines.append(f"Razlog: {razlog}")
-
+    timestamp = datetime.datetime.now().strftime("%d.%m.%Y %H:%M:%S")
     printer_name = str(payload.get("printer_name") or payload.get("resolved_printer") or "").strip()
-    if printer_name:
-        lines.append(f"Printer: {printer_name}")
-    if payload.get("pdf_path"):
-        lines.append(f"PDF: {payload.get('pdf_path')}")
-    if payload.get("docx_path"):
-        lines.append(f"DOCX: {payload.get('docx_path')}")
+    printed = bool(payload.get("printed"))
+    lines = [
+        "Потврда одштампана" if printed else "Потврда генерисана",
+        "",
+        f"ID: {job_id}",
+        f"Вријеме: {timestamp}",
+        f"Уређај: {socket.gethostname()}",
+        "",
+        f"Име ученика: {_telegram_value(form_data.get('ime_ucenika'))}",
+        f"Презиме ученика: {_telegram_value(form_data.get('prezime'))}",
+        f"Име и презиме: {_telegram_value(form_data.get('ime'))}",
+        f"Име родитеља: {_telegram_value(form_data.get('roditelj'))}",
+        f"Датум рођења: {_telegram_birth_date(form_data)}",
+        f"Мјесто рођења: {_telegram_value(form_data.get('mjesto'))}",
+        f"Општина рођења: {_telegram_value(form_data.get('opstina'))}",
+        f"Разред: {_telegram_value(form_data.get('razred'))}",
+        f"Струка: {_telegram_value(form_data.get('struka'))}",
+        f"Разлог: {_telegram_value(form_data.get('razlog'))}",
+        "",
+        f"Штампач: {_telegram_value(printer_name)}",
+        f"Статус штампе: {'успјешно' if printed else 'није послато на штампу'}",
+        f"Документи: {_telegram_cleanup_status(payload)}",
+    ]
+    bytes_freed = int(payload.get("cleanup_bytes_freed") or 0)
+    if bytes_freed:
+        lines.append(f"Ослобођено: {format_bytes(bytes_freed)}")
 
     notify_telegram_async("\n".join(lines), kind="status")
 
@@ -127,6 +156,7 @@ def _fail(job_dir: Path, payload: Dict, job_id: str, error_code: str, user_messa
         payload["pdf_path"] = pdf_path
     _write_job_json(job_dir, payload)
     _notify_job_failure(job_id, payload, error_code, user_message, detail, docx_path=docx_path, pdf_path=pdf_path)
+    check_storage_pressure_async(reason=f"print-failed:{error_code}")
     return PrintResult(False, job_id, docx_path=docx_path, pdf_path=pdf_path, error_code=error_code, user_message=user_message, detail=detail)
 
 
@@ -232,6 +262,10 @@ def run_print_job(
         "form_data": form_data,
     }
     _write_job_json(job_dir, payload)
+
+    if not config.is_within_working_hours():
+        message = f"{config.working_hours_unavailable_message()} Обратите се секретаријату у радно вријеме."
+        return _fail(job_dir, payload, job_id, "OUTSIDE_WORKING_HOURS", message)
 
     is_valid, validation_message = _validate_form_data(form_data)
     if not is_valid:
@@ -340,7 +374,11 @@ def run_print_job(
             }
         )
         _write_job_json(job_dir, payload)
+        cleanup_metadata = cleanup_print_job_documents(job_dir, output_docx, pdf_path)
+        payload.update(cleanup_metadata)
+        _write_job_json(job_dir, payload)
         _notify_job_success(job_id, payload)
+        check_storage_pressure_async(reason="print-success")
         return PrintResult(True, job_id, docx_path=str(output_docx), pdf_path=str(pdf_path))
     except FileNotFoundError as e:
         log_error(f"[JOB] {job_id} file missing: {e}")

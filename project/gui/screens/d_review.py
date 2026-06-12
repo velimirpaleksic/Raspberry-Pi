@@ -101,7 +101,7 @@ class ReviewScreen(tk.Frame):
             f"Име родитеља: {self._capitalize_words(data.get('roditelj', ''), single_word=True)}",
             f"Датум рођења: {datum}",
             f"Мјесто рођења: {self._capitalize_words(data.get('mjesto', ''))}",
-            f"Општина: {self._capitalize_words(data.get('opstina', ''))}",
+            f"Општина рођења: {self._capitalize_words(data.get('opstina', ''))}",
             f"Разред: {data.get('razred', '')}",
             f"Струка: {data.get('struka', '')}",
             f"Разлог: {data.get('razlog', '')}",
