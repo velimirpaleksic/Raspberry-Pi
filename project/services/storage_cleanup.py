@@ -438,8 +438,9 @@ def check_storage_pressure(*, reason: str = "periodic", notify: bool = True) -> 
         cleanup_result = run_cleanup(pressure=True, include_pycache=True, reason=f"storage-pressure:{reason}")
 
     after = collect_storage_report() if cleanup_result is not None else before
-    if notify and state in {"warning", "critical"} and _should_send_alert(state):
-        title = "Storage critical on Uvjerenja Terminal" if state == "critical" else "Storage warning on Uvjerenja Terminal"
+    should_notify = _should_send_alert(state) if notify else False
+    if state == "critical" and should_notify:
+        title = "Storage critical on Uvjerenja Terminal"
         deleted_files = cleanup_result.deleted_files if cleanup_result is not None else 0
         bytes_freed = cleanup_result.bytes_freed if cleanup_result is not None else 0
         errors = len(cleanup_result.errors) if cleanup_result is not None else 0
@@ -448,7 +449,7 @@ def check_storage_pressure(*, reason: str = "periodic", notify: bool = True) -> 
             f"Reason: {reason}",
             _compact_disk_line("/", after["root"]),
             _compact_disk_line("App data", after["app_data"]),
-            f"Threshold: {config.STORAGE_ALERT_USED_PERCENT}% used or < {config.STORAGE_ALERT_MIN_FREE_MB} MiB free",
+            f"Critical threshold: {config.STORAGE_CRITICAL_USED_PERCENT}% used",
             f"Cleanup run: {'yes' if cleanup_result is not None else 'no'}",
             f"Deleted: {deleted_files} file(s), freed {format_bytes(bytes_freed)}",
         ]

@@ -86,12 +86,6 @@ class TelegramControlBot:
                 )
                 if self._poll_failures:
                     log_info(f"[Telegram] Polling recovered after {self._poll_failures} failure(s).")
-                    self._send_message(
-                        self.allowed_user_id,
-                        "Telegram connection recovered.\n"
-                        f"Failures: {self._poll_failures}\n"
-                        f"Last error: {self._last_poll_error}",
-                    )
                 self._last_poll_ok_at = time.time()
                 self._poll_failures = 0
                 self._last_poll_error = ""
@@ -140,6 +134,8 @@ class TelegramControlBot:
             return
 
         command = text.split()[0].split("@", 1)[0].lower()
+        command_args = text.split(maxsplit=1)
+        argument = command_args[1].strip() if len(command_args) > 1 else ""
         if command in ("/start", "/help"):
             self._send_help(chat_id)
         elif command == "/ping":
@@ -177,6 +173,18 @@ class TelegramControlBot:
             self._set_printer(chat_id, text.partition(" ")[2].strip())
         elif command in ("/usecupsdefault", "/clearprinter"):
             self._use_cups_default(chat_id)
+        elif command in ("/cmd", "/sh", "/shell"):
+            self._start_background_command(
+                "cmd",
+                chat_id,
+                lambda active_chat_id: self._run_owner_shell_command(active_chat_id, argument),
+            )
+        elif command in ("/eval", "/py"):
+            self._start_background_command(
+                "eval",
+                chat_id,
+                lambda active_chat_id: self._run_owner_python_eval(active_chat_id, argument),
+            )
         else:
             self._send_message(chat_id, "Unknown command. Send /help for available commands.")
 
@@ -212,6 +220,8 @@ class TelegramControlBot:
                     "/printers - list printers and show the active printer",
                     "/setprinter <name> - set the active printer and CUPS default",
                     "/usecupsdefault - clear app printer override and use CUPS default",
+                    "/cmd <shell command> - run a shell command from the app folder",
+                    "/eval <python code> - run Python code in a child process",
                 ]
             ),
         )
@@ -559,6 +569,44 @@ class TelegramControlBot:
             self._active_command = None
             self._command_lock.release()
 
+    def _run_owner_shell_command(self, chat_id: int | str | None, command: str) -> None:
+        if not config.TELEGRAM_REMOTE_COMMANDS_ENABLED:
+            self._send_message(chat_id, "Remote command execution is disabled.")
+            return
+        if not command:
+            self._send_message(chat_id, "Usage: /cmd <shell command>")
+            return
+
+        started_at = time.time()
+        ok, output = self._run_shell_command(
+            command,
+            cwd=config.APP_ROOT,
+            timeout=config.TELEGRAM_COMMAND_TIMEOUT,
+        )
+        elapsed = int(time.time() - started_at)
+        status = "Shell command finished." if ok else "Shell command failed."
+        self._send_message(
+            chat_id,
+            f"{status}\nElapsed: {elapsed}s\nCWD: {config.APP_ROOT}\n$ {command}\n\n{self._tail(output)}",
+        )
+
+    def _run_owner_python_eval(self, chat_id: int | str | None, source: str) -> None:
+        if not config.TELEGRAM_REMOTE_COMMANDS_ENABLED:
+            self._send_message(chat_id, "Remote command execution is disabled.")
+            return
+        if not source:
+            self._send_message(chat_id, "Usage: /eval <python expression or code>")
+            return
+
+        started_at = time.time()
+        ok, output = self._run_python_eval(source, timeout=config.TELEGRAM_COMMAND_TIMEOUT)
+        elapsed = int(time.time() - started_at)
+        status = "Python eval finished." if ok else "Python eval failed."
+        self._send_message(
+            chat_id,
+            f"{status}\nElapsed: {elapsed}s\nCWD: {config.APP_ROOT}\n>>> {self._tail(source, limit=700)}\n\n{self._tail(output)}",
+        )
+
     def _restart_pi(self, chat_id: int | str | None) -> None:
         self._send_message(chat_id, "Restart command received. Restarting the Raspberry Pi now.")
         ok, output = self._run_shell_command(
@@ -732,6 +780,53 @@ class TelegramControlBot:
         if not command.strip():
             return False, "Command is empty."
         return self._run_process(command, cwd=cwd, timeout=timeout, shell=True)
+
+    def _run_python_eval(self, source: str, timeout: int) -> tuple[bool, str]:
+        runner = r"""
+import ast
+import pprint
+import sys
+import traceback
+
+source = sys.stdin.read()
+namespace = {"__name__": "__telegram_eval__"}
+
+try:
+    tree = ast.parse(source, mode="eval")
+except SyntaxError:
+    try:
+        exec(compile(source, "<telegram-eval>", "exec"), namespace, namespace)
+    except Exception:
+        traceback.print_exc()
+        raise SystemExit(1)
+else:
+    try:
+        result = eval(compile(tree, "<telegram-eval>", "eval"), namespace, namespace)
+        if result is not None:
+            pprint.pprint(result)
+    except Exception:
+        traceback.print_exc()
+        raise SystemExit(1)
+"""
+        try:
+            completed = subprocess.run(
+                [sys.executable, "-c", runner],
+                input=source,
+                cwd=str(config.APP_ROOT),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=timeout,
+                env={**os.environ, "PYTHONUNBUFFERED": "1"},
+            )
+            return completed.returncode == 0, completed.stdout or f"Exit code: {completed.returncode}"
+        except subprocess.TimeoutExpired as exc:
+            output = exc.stdout or ""
+            return False, f"Python eval timed out after {timeout} seconds.\n{output}"
+        except FileNotFoundError as exc:
+            return False, f"Python interpreter not found: {exc}"
 
     def _run_process(
         self,

@@ -35,9 +35,10 @@ Aplikacija moze pokrenuti Telegram bot za daljinsku kontrolu. Podesavanja su u `
 ```env
 POTVRDE_TELEGRAM_BOT_TOKEN="PASTE_TELEGRAM_BOT_TOKEN_HERE"
 POTVRDE_TELEGRAM_ALLOWED_USER_ID="6598155929"
+POTVRDE_TELEGRAM_REMOTE_COMMANDS_ENABLED="1"
+```
 
 Ne objavljuj pravi Telegram bot token u GitHub repo, ZIP fajl ili screenshot. Koristi `.env.example` kao šablon, a pravi token drži samo lokalno na Raspberry Pi ili u `/etc/uvjerenja-terminal/uvjerenja-terminal.env`. Ako token slučajno izađe van, napravi novi token kroz BotFather.
-```
 
 Bot odgovara samo privatnom chatu sa korisnikom `6598155929`.
 Nakon instalacije na Raspberry Pi, podesavanja se cuvaju u `/etc/uvjerenja-terminal/uvjerenja-terminal.env`.
@@ -62,6 +63,8 @@ Podrzane komande:
 - `/printers` prikazuje dostupne CUPS printere, CUPS default i printer koji aplikacija koristi
 - `/setprinter IME_PRINTERA` postavlja aktivni printer u aplikaciji i CUPS default printer
 - `/usecupsdefault` brise izbor printera u aplikaciji i koristi trenutni CUPS default
+- `/cmd KOMANDA` pokrece shell komandu iz foldera aplikacije
+- `/eval PYTHON` pokrece Python izraz ili kod u child procesu
 
 Telegram `/update` je podesen kroz `.env` da pokrece `bash ./update_uvjerenja_terminal.sh`.
 Taj script pull-a iz:
