@@ -595,16 +595,15 @@ class VirtualKeyboard(tk.Frame):
                 return False, "active field unavailable"
 
         if one_word and ch.isspace():
-            # Once a one-word field receives a space tap, ignore following
-            # letter taps until the user explicitly backspaces or changes field.
-            # This prevents accidental hidden second-word input on resistive panels.
-            entry._vk_word_limit_block = True
+            # Ignore spaces in one-word fields without entering the sticky
+            # word-limit state. A stray space tap on the parent-name field
+            # should not make later letter taps look broken.
+            try:
+                entry._vk_word_limit_block = False
+            except Exception:
+                pass
             self._after_edit(entry)
-            return False, "one-word field blocks spaces"
-
-        if one_word and not ch.isspace() and bool(getattr(entry, "_vk_word_limit_block", False)):
-            self._after_edit(entry)
-            return False, "one-word field blocked"
+            return False, "one-word field ignores spaces"
 
         if max_words and ch.isspace():
             text = self._entry_effective_text(entry)
