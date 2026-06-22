@@ -18,6 +18,10 @@ if [[ -f "$LOCAL_ENV_FILE" ]]; then
 fi
 
 AUTOSTART_MODE="${POTVRDE_AUTOSTART_ENABLED:-${AUTOSTART_MODE:-ask}}"
+DEFAULT_UPDATE_REPO_URL="https://github.com/velimirpaleksic/Raspberry-Pi.git"
+DEFAULT_UPDATE_SOURCE_DIR="/home/$INSTALL_USER/Raspberry-Pi"
+DEFAULT_UPDATE_BRANCH=""
+DEFAULT_UPDATE_COMMAND="bash ./update_uvjerenja_terminal.sh"
 usage() {
   cat <<USAGE
 Install Uvjerenja Terminal
@@ -126,11 +130,31 @@ POTVRDE_APP_ID="$APP_ID"
 POTVRDE_APP_TITLE="$APP_TITLE"
 POTVRDE_PRINTER_NAME="$PRINTER_TO_WRITE"
 POTVRDE_VAR_DIR="$VAR_DIR"
+POTVRDE_TEMPLATE_PATH="$SRC_DST/project/docs/template.docx"
 POTVRDE_DEBUG_MODE="0"
+POTVRDE_SUBPROCESS_TIMEOUT="60"
+POTVRDE_DOCX_CONVERT_TIMEOUT="45"
+POTVRDE_PRINT_TIMEOUT="30"
+POTVRDE_IDLE_TIMEOUT_MS="60000"
 POTVRDE_PRINTER_CHECK_RETRY_ATTEMPTS="5"
 POTVRDE_PRINTER_CHECK_RETRY_DELAY_SECONDS="3"
 POTVRDE_PRINT_RETRY_ATTEMPTS="3"
 POTVRDE_PRINT_RETRY_DELAY_SECONDS="3"
+POTVRDE_WORKING_HOURS_ENABLED="1"
+POTVRDE_WORKING_HOURS_START="08:00"
+POTVRDE_WORKING_HOURS_END="15:00"
+POTVRDE_CLEANUP_ENABLED="1"
+POTVRDE_CLEANUP_INTERVAL_MINUTES="30"
+POTVRDE_SUCCESSFUL_JOB_DOCUMENT_RETENTION_MINUTES="0"
+POTVRDE_FAILED_JOB_RETENTION_DAYS="7"
+POTVRDE_JOB_JSON_RETENTION_DAYS="30"
+POTVRDE_LOG_RETENTION_DAYS="90"
+POTVRDE_STORAGE_ALERT_USED_PERCENT="90"
+POTVRDE_STORAGE_CRITICAL_USED_PERCENT="95"
+POTVRDE_STORAGE_ALERT_MIN_FREE_MB="512"
+POTVRDE_STORAGE_CLEANUP_ON_PRESSURE="1"
+POTVRDE_STORAGE_ALERT_COOLDOWN_MINUTES="60"
+POTVRDE_STORAGE_CHECK_INTERVAL_MINUTES="30"
 POTVRDE_TELEGRAM_ENABLED="1"
 POTVRDE_TELEGRAM_BOT_TOKEN="${POTVRDE_TELEGRAM_BOT_TOKEN:-}"
 POTVRDE_TELEGRAM_ALLOWED_USER_ID="${POTVRDE_TELEGRAM_ALLOWED_USER_ID:-6598155929}"
@@ -156,14 +180,108 @@ POTVRDE_NETWORK_CHECK_TIMEOUT="5"
 POTVRDE_NETWORK_RECONNECT_COMMAND=""
 POTVRDE_CUPS_RESTART_COMMAND="sudo -n systemctl restart cups"
 POTVRDE_TELEGRAM_LOG_TAIL_LINES="80"
-POTVRDE_UPDATE_REPO_URL="${POTVRDE_UPDATE_REPO_URL:-https://github.com/velimirpaleksic/Raspberry-Pi.git}"
-POTVRDE_UPDATE_SOURCE_DIR="${POTVRDE_UPDATE_SOURCE_DIR:-/home/$INSTALL_USER/Raspberry-Pi}"
-POTVRDE_UPDATE_BRANCH="${POTVRDE_UPDATE_BRANCH:-}"
-POTVRDE_UPDATE_COMMAND="${POTVRDE_UPDATE_COMMAND:-bash ./update_uvjerenja_terminal.sh}"
+POTVRDE_UPDATE_REPO_URL="${POTVRDE_UPDATE_REPO_URL:-$DEFAULT_UPDATE_REPO_URL}"
+POTVRDE_UPDATE_SOURCE_DIR="${POTVRDE_UPDATE_SOURCE_DIR:-$DEFAULT_UPDATE_SOURCE_DIR}"
+POTVRDE_UPDATE_BRANCH="${POTVRDE_UPDATE_BRANCH:-$DEFAULT_UPDATE_BRANCH}"
+POTVRDE_UPDATE_COMMAND="${POTVRDE_UPDATE_COMMAND:-$DEFAULT_UPDATE_COMMAND}"
 EOF
   log_ok "Env file created."
 else
   log_info "Env file already exists (keeping): $ENV_FILE"
+fi
+
+ensure_env_setting() {
+  local key="$1"
+  local value="$2"
+  local escaped_value
+  escaped_value="${value//\\/\\\\}"
+  escaped_value="${escaped_value//\"/\\\"}"
+
+  if sudo grep -qE "^${key}=" "$ENV_FILE" 2>/dev/null; then
+    return
+  fi
+
+  log_info "Adding missing env setting: $key"
+  printf '%s="%s"\n' "$key" "$escaped_value" | sudo tee -a "$ENV_FILE" >/dev/null
+}
+
+replace_env_setting() {
+  local key="$1"
+  local value="$2"
+  local escaped_value
+  escaped_value="${value//\\/\\\\}"
+  escaped_value="${escaped_value//\"/\\\"}"
+
+  log_info "Updating env setting: $key"
+  sudo sed -i "s|^${key}=.*|${key}=\"$escaped_value\"|" "$ENV_FILE"
+}
+
+ensure_env_setting "POTVRDE_APP_ID" "$APP_ID"
+ensure_env_setting "POTVRDE_APP_TITLE" "$APP_TITLE"
+ensure_env_setting "POTVRDE_PRINTER_NAME" "$PRINTER_TO_WRITE"
+ensure_env_setting "POTVRDE_VAR_DIR" "$VAR_DIR"
+ensure_env_setting "POTVRDE_TEMPLATE_PATH" "$SRC_DST/project/docs/template.docx"
+ensure_env_setting "POTVRDE_DEBUG_MODE" "0"
+ensure_env_setting "POTVRDE_SUBPROCESS_TIMEOUT" "60"
+ensure_env_setting "POTVRDE_DOCX_CONVERT_TIMEOUT" "45"
+ensure_env_setting "POTVRDE_PRINT_TIMEOUT" "30"
+ensure_env_setting "POTVRDE_IDLE_TIMEOUT_MS" "60000"
+ensure_env_setting "POTVRDE_PRINTER_CHECK_RETRY_ATTEMPTS" "5"
+ensure_env_setting "POTVRDE_PRINTER_CHECK_RETRY_DELAY_SECONDS" "3"
+ensure_env_setting "POTVRDE_PRINT_RETRY_ATTEMPTS" "3"
+ensure_env_setting "POTVRDE_PRINT_RETRY_DELAY_SECONDS" "3"
+ensure_env_setting "POTVRDE_WORKING_HOURS_ENABLED" "1"
+ensure_env_setting "POTVRDE_WORKING_HOURS_START" "08:00"
+ensure_env_setting "POTVRDE_WORKING_HOURS_END" "15:00"
+ensure_env_setting "POTVRDE_CLEANUP_ENABLED" "1"
+ensure_env_setting "POTVRDE_CLEANUP_INTERVAL_MINUTES" "30"
+ensure_env_setting "POTVRDE_SUCCESSFUL_JOB_DOCUMENT_RETENTION_MINUTES" "0"
+ensure_env_setting "POTVRDE_FAILED_JOB_RETENTION_DAYS" "7"
+ensure_env_setting "POTVRDE_JOB_JSON_RETENTION_DAYS" "30"
+ensure_env_setting "POTVRDE_LOG_RETENTION_DAYS" "90"
+ensure_env_setting "POTVRDE_STORAGE_ALERT_USED_PERCENT" "90"
+ensure_env_setting "POTVRDE_STORAGE_CRITICAL_USED_PERCENT" "95"
+ensure_env_setting "POTVRDE_STORAGE_ALERT_MIN_FREE_MB" "512"
+ensure_env_setting "POTVRDE_STORAGE_CLEANUP_ON_PRESSURE" "1"
+ensure_env_setting "POTVRDE_STORAGE_ALERT_COOLDOWN_MINUTES" "60"
+ensure_env_setting "POTVRDE_STORAGE_CHECK_INTERVAL_MINUTES" "30"
+ensure_env_setting "POTVRDE_TELEGRAM_ENABLED" "1"
+ensure_env_setting "POTVRDE_TELEGRAM_BOT_TOKEN" "${POTVRDE_TELEGRAM_BOT_TOKEN:-}"
+ensure_env_setting "POTVRDE_TELEGRAM_ALLOWED_USER_ID" "${POTVRDE_TELEGRAM_ALLOWED_USER_ID:-6598155929}"
+ensure_env_setting "POTVRDE_TELEGRAM_ERROR_NOTIFICATIONS" "1"
+ensure_env_setting "POTVRDE_TELEGRAM_STATUS_NOTIFICATIONS" "1"
+ensure_env_setting "POTVRDE_TELEGRAM_NOTIFY_ONLINE" "1"
+ensure_env_setting "POTVRDE_TELEGRAM_NOTIFY_PRINT_JOBS" "1"
+ensure_env_setting "POTVRDE_TELEGRAM_NOTIFY_UPDATE_EVENTS" "1"
+ensure_env_setting "POTVRDE_TELEGRAM_ERROR_COOLDOWN_SECONDS" "60"
+ensure_env_setting "POTVRDE_TELEGRAM_POLL_TIMEOUT" "25"
+ensure_env_setting "POTVRDE_TELEGRAM_POLL_BACKOFF_MAX_SECONDS" "60"
+ensure_env_setting "POTVRDE_TELEGRAM_SEND_RETRY_ATTEMPTS" "5"
+ensure_env_setting "POTVRDE_TELEGRAM_SEND_RETRY_DELAY_SECONDS" "2"
+ensure_env_setting "POTVRDE_TELEGRAM_COMMAND_TIMEOUT" "900"
+ensure_env_setting "POTVRDE_TELEGRAM_REMOTE_COMMANDS_ENABLED" "1"
+ensure_env_setting "POTVRDE_REBOOT_COMMAND" "sudo -n shutdown -r now"
+ensure_env_setting "POTVRDE_RELAUNCH_AFTER_UPDATE" "1"
+ensure_env_setting "POTVRDE_RELAUNCH_COMMAND" "$LAUNCHER"
+ensure_env_setting "POTVRDE_AUTOSTART_ENABLED" "$AUTOSTART_MODE"
+ensure_env_setting "POTVRDE_NETWORK_CHECK_HOST" "api.telegram.org"
+ensure_env_setting "POTVRDE_NETWORK_CHECK_PORT" "443"
+ensure_env_setting "POTVRDE_NETWORK_CHECK_TIMEOUT" "5"
+ensure_env_setting "POTVRDE_NETWORK_RECONNECT_COMMAND" ""
+ensure_env_setting "POTVRDE_CUPS_RESTART_COMMAND" "sudo -n systemctl restart cups"
+ensure_env_setting "POTVRDE_TELEGRAM_LOG_TAIL_LINES" "80"
+ensure_env_setting "POTVRDE_UPDATE_REPO_URL" "$DEFAULT_UPDATE_REPO_URL"
+ensure_env_setting "POTVRDE_UPDATE_SOURCE_DIR" "$DEFAULT_UPDATE_SOURCE_DIR"
+ensure_env_setting "POTVRDE_UPDATE_BRANCH" "$DEFAULT_UPDATE_BRANCH"
+ensure_env_setting "POTVRDE_UPDATE_COMMAND" "$DEFAULT_UPDATE_COMMAND"
+if sudo grep -qiE '^POTVRDE_UPDATE_REPO_URL=.*(essentials|Raspberry-Pi-main)' "$ENV_FILE" 2>/dev/null; then
+  replace_env_setting "POTVRDE_UPDATE_REPO_URL" "$DEFAULT_UPDATE_REPO_URL"
+fi
+if sudo grep -qiE '^POTVRDE_UPDATE_SOURCE_DIR=.*(essentials|Raspberry-Pi-main)' "$ENV_FILE" 2>/dev/null; then
+  replace_env_setting "POTVRDE_UPDATE_SOURCE_DIR" "$DEFAULT_UPDATE_SOURCE_DIR"
+fi
+if sudo grep -qiE '^POTVRDE_UPDATE_COMMAND=.*(essentials|Raspberry-Pi-main)' "$ENV_FILE" 2>/dev/null; then
+  replace_env_setting "POTVRDE_UPDATE_COMMAND" "$DEFAULT_UPDATE_COMMAND"
 fi
 sudo chown "$INSTALL_USER":"$INSTALL_USER" "$ENV_FILE"
 sudo chmod 0600 "$ENV_FILE"

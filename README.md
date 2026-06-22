@@ -43,6 +43,7 @@ Ne objavljuj pravi Telegram bot token u GitHub repo, ZIP fajl ili screenshot. Ko
 Bot odgovara samo privatnom chatu sa korisnikom `6598155929`.
 Nakon instalacije na Raspberry Pi, podesavanja se cuvaju u `/etc/uvjerenja-terminal/uvjerenja-terminal.env`.
 Ako taj fajl vec postoji, installer ga ne pregazi; tada ponovo upisi token tamo ili ukloni fajl prije nove instalacije.
+Kod update-a installer ipak doda nove kljuceve koji nedostaju u tom realnom env fajlu, sa default vrijednostima iz projekta. Postojece vrijednosti, ukljucujuci Telegram token, ostaju sacuvane.
 
 Podrzane komande:
 - `/help` prikazuje dostupne komande
@@ -77,8 +78,15 @@ Podrazumijevani update radi ovako:
 - ako source repo ne postoji, clone-uje repo
 - ako repo vec postoji, fetch-uje branch iz `origin`
 - lokalni source resetuje na `origin/<branch>` da lokalne izmjene ne blokiraju update
+- prikaze prethodni commit i commit na koji je update presao
 - nakon toga pokrece `install_uvjerenja_terminal.sh`
 - nakon uspjesnog update-a Telegram bot pokrece launcher za novu verziju i zatvara staru aplikaciju
+
+Default update repo je:
+
+```env
+POTVRDE_UPDATE_REPO_URL="https://github.com/velimirpaleksic/Raspberry-Pi.git"
+```
 
 Lokaciju source repoa mozes promijeniti u `.env`:
 

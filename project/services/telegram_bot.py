@@ -837,7 +837,12 @@ class TelegramControlBot:
                 cwd=config.APP_ROOT,
                 timeout=config.TELEGRAM_COMMAND_TIMEOUT,
             )
-            return ok, f"$ {command}\nCWD: {config.APP_ROOT}\n{output}"
+            result = f"$ {command}\nCWD: {config.APP_ROOT}\n{output}"
+            if ok:
+                source_status = self._update_source_status_text()
+                if source_status:
+                    result = f"{result.rstrip()}\n\n{source_status}"
+            return ok, result
 
         repo_root = self._git_repository_root()
         if repo_root is None:
@@ -845,7 +850,7 @@ class TelegramControlBot:
                 False,
                 "No Git repository was found for the running app. "
                 "Set POTVRDE_UPDATE_COMMAND in .env, for example: "
-                "cd /home/pi/Raspberry-Pi-main && git pull --ff-only && ./install_uvjerenja_terminal.sh",
+                "bash ./update_uvjerenja_terminal.sh",
             )
 
         outputs: list[str] = []
@@ -951,6 +956,9 @@ class TelegramControlBot:
     def _git_status_lines(self) -> list[str]:
         repo_root = self._git_repository_root()
         if repo_root is None:
+            source_lines = self._update_source_git_status_lines()
+            if source_lines:
+                return ["Git: deployed app is not a repository", *source_lines]
             return ["Git: not a repository"]
 
         ok, commit = self._run_git(repo_root, ["rev-parse", "--short", "HEAD"], timeout=15)
@@ -970,6 +978,37 @@ class TelegramControlBot:
             f"Git branch: {branch_text}",
             f"Git commit: {commit_text}",
             f"Git state: {dirty_text}",
+        ]
+
+    def _update_source_status_text(self) -> str:
+        lines = self._update_source_git_status_lines()
+        return "\n".join(lines)
+
+    def _update_source_git_status_lines(self) -> list[str]:
+        repo_root = config.UPDATE_SOURCE_DIR
+        if not (repo_root / ".git").exists():
+            return []
+
+        ok, commit = self._run_git(repo_root, ["rev-parse", "--verify", "HEAD"], timeout=15)
+        commit_full = commit.strip().splitlines()[-1] if ok and commit.strip() else "unknown"
+        commit_short = self._short_commit(commit_full)
+
+        ok, branch = self._run_git(repo_root, ["branch", "--show-current"], timeout=15)
+        branch_text = branch.strip().splitlines()[-1] if ok and branch.strip() else ""
+        if not branch_text:
+            ok, branch = self._run_git(repo_root, ["rev-parse", "--abbrev-ref", "HEAD"], timeout=15)
+            branch_text = branch.strip().splitlines()[-1] if ok and branch.strip() else "unknown"
+        if branch_text == "HEAD":
+            branch_text = "(detached)"
+
+        ok, remote = self._run_git(repo_root, ["remote", "get-url", "origin"], timeout=15)
+        remote_text = remote.strip().splitlines()[-1] if ok and remote.strip() else config.UPDATE_REPO_URL
+
+        return [
+            f"Update source repo: {repo_root}",
+            f"Update remote: {remote_text}",
+            f"Updated branch: {branch_text}",
+            f"Updated commit: {commit_short} ({commit_full})",
         ]
 
     def _run_git(self, repo_root: Path, args: list[str], timeout: int) -> tuple[bool, str]:
