@@ -623,8 +623,10 @@ class VirtualKeyboard(tk.Frame):
             suffix = digits[2:] if digits.startswith("20") else digits[-2:]
             suffix = suffix[:2]
             if len(suffix) >= 2:
+                if not self._replace_entry(entry, "20" + ch):
+                    return False, "active field unavailable"
                 self._after_edit(entry)
-                return False, "max digits reached"
+                return True, ""
             if not self._replace_entry(entry, "20" + suffix + ch):
                 return False, "active field unavailable"
             self._after_edit(entry)
@@ -737,8 +739,12 @@ class VirtualKeyboard(tk.Frame):
 
     def _replace_entry(self, entry: tk.Entry, value: str) -> bool:
         try:
-            entry.delete(0, "end")
-            entry.insert(0, value)
+            textvariable = str(entry.cget("textvariable") or "")
+            if textvariable:
+                entry.setvar(textvariable, value)
+            else:
+                entry.delete(0, "end")
+                entry.insert(0, value)
             entry.icursor("end")
             return True
         except Exception:

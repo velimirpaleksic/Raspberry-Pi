@@ -803,24 +803,66 @@ class FormScreen(tk.Frame):
             return None
         if getattr(event, "state", 0) & 0x4:
             return None
+        widget = getattr(event, "widget", None)
+        entry = widget if isinstance(widget, tk.Entry) else self.godina_entry
         keysym = getattr(event, "keysym", "")
         char = getattr(event, "char", "")
-        if keysym in {"Left", "Right", "Home", "End", "Tab", "Delete"}:
+        if keysym == "Tab":
             return None
-        if keysym == "BackSpace":
+        if keysym == "Home":
             try:
-                if self.godina_entry.index(tk.INSERT) <= 2:
-                    return "break"
+                entry.icursor(2)
             except Exception:
                 pass
+            return "break"
+        if keysym == "Left":
+            try:
+                if entry.index(tk.INSERT) <= 2:
+                    return "break"
+            except Exception:
+                return "break"
+            return None
+        if keysym in {"Right", "End"}:
+            return None
+        if keysym == "Delete":
+            if self._year_selection_touches_prefix(entry):
+                return "break"
+            try:
+                if entry.index(tk.INSERT) < 2:
+                    return "break"
+            except Exception:
+                return "break"
+            return None
+        if keysym == "BackSpace":
+            if self._year_selection_touches_prefix(entry):
+                return "break"
+            try:
+                if entry.index(tk.INSERT) <= 2:
+                    return "break"
+            except Exception:
+                return "break"
             return None
         if char and not char.isdigit():
             return "break"
         if char and char.isdigit():
-            digits = "".join(c for c in self.godina_entry.get() if c.isdigit())
+            if self._year_selection_touches_prefix(entry):
+                return "break"
+            try:
+                if entry.index(tk.INSERT) < 2:
+                    entry.icursor("end")
+            except Exception:
+                pass
+            digits = "".join(c for c in entry.get() if c.isdigit())
             suffix = digits[2:] if digits.startswith("20") else digits[-2:]
-            has_selection = self._entry_has_selection(self.godina_entry)
+            has_selection = self._entry_has_selection(entry)
             if len(suffix) >= 2 and not has_selection:
+                self._set_entry_text(entry, "20" + char)
+                try:
+                    entry.icursor("end")
+                except Exception:
+                    pass
+                if self.kbd and self.active_entry is entry:
+                    self.kbd.set_active_entry(entry)
                 return "break"
         return None
 
@@ -845,6 +887,12 @@ class FormScreen(tk.Frame):
             entry.index("sel.first")
             entry.index("sel.last")
             return True
+        except Exception:
+            return False
+
+    def _year_selection_touches_prefix(self, entry: tk.Entry) -> bool:
+        try:
+            return entry.index("sel.first") < 2
         except Exception:
             return False
 
@@ -995,6 +1043,10 @@ class FormScreen(tk.Frame):
 
     def _set_entry_text(self, entry: tk.Entry, value: str, *, placeholder: str | None = None) -> None:
         self._suppress_field_events = True
+        field_key = getattr(entry, "field_key", "")
+        date_trace_was_busy = self._date_trace_busy
+        if field_key in self.DATE_FIELDS:
+            self._date_trace_busy = True
         try:
             entry.delete(0, "end")
             if value:
@@ -1005,6 +1057,7 @@ class FormScreen(tk.Frame):
             else:
                 self._safe_config(entry, fg="#111111")
         finally:
+            self._date_trace_busy = date_trace_was_busy
             self._suppress_field_events = False
 
     def _reset_form(self) -> None:
