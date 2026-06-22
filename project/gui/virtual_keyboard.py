@@ -92,7 +92,9 @@ class VirtualKeyboard(tk.Frame):
 
     KEY_BG = "#5b5d63"
     KEY_ACTIVE_BG = "#737780"
+    KEY_DISABLED_BG = "#d4d4d4"
     KEY_FG = "#ffffff"
+    KEY_DISABLED_FG = "#777777"
     DOCK_BG = "#f5f5f5"
 
     def __init__(
@@ -110,6 +112,7 @@ class VirtualKeyboard(tk.Frame):
         self.target_width = int(target_width or 1000)
         self.target_height = int(target_height or 260)
         self.active_entry: tk.Entry | None = None
+        self._last_active_entry: tk.Entry | None = None
         self.mode = "alpha"
         self.force_uppercase = True
         self._keys: list[tk.Widget] = []
@@ -173,6 +176,7 @@ class VirtualKeyboard(tk.Frame):
         try:
             if self._entry_is_usable(entry):
                 self.active_entry = entry
+                self._last_active_entry = entry
                 self._sync_mode_for_entry(entry)
             else:
                 self.active_entry = None
@@ -182,6 +186,8 @@ class VirtualKeyboard(tk.Frame):
 
     def clear_active_entry(self) -> None:
         self.active_entry = None
+        self._last_active_entry = None
+        self._refresh_key_labels()
 
     def set_mode(self, mode: str, *, uppercase: bool | None = None) -> None:
         mode = mode if mode in {"alpha", "numeric"} else "alpha"
@@ -333,6 +339,8 @@ class VirtualKeyboard(tk.Frame):
         key._vk_token = token
         key._normal_bg = self.KEY_BG
         key._active_bg = self.KEY_ACTIVE_BG
+        key._disabled_bg = self.KEY_DISABLED_BG
+        key._vk_disabled = False
 
         label = tk.Label(
             key,
@@ -368,12 +376,25 @@ class VirtualKeyboard(tk.Frame):
     def _refresh_key_labels(self) -> None:
         for key in self._keys:
             token = getattr(key, "_vk_token", "")
+            key._vk_disabled = self._token_disabled(token)
             for child in key.winfo_children():
                 if isinstance(child, tk.Label):
                     try:
-                        child.config(text=self._display_label(token))
+                        child.config(
+                            text=self._display_label(token),
+                            fg=self.KEY_DISABLED_FG if key._vk_disabled else self.KEY_FG,
+                        )
                     except Exception:
                         pass
+            self._set_key_bg(key, active=False)
+
+    def _token_disabled(self, token: str) -> bool:
+        if token != "space":
+            return False
+        entry = self.active_entry if self._entry_is_usable(self.active_entry) else None
+        if entry is None and self._entry_is_usable(self._last_active_entry):
+            entry = self._last_active_entry
+        return bool(entry is not None and getattr(entry, "_vk_one_word", False))
 
     def _log_debug(self, message: str) -> None:
         if not self._touch_debug:
@@ -462,6 +483,19 @@ class VirtualKeyboard(tk.Frame):
             self._log_warning(f"[VK] Key {token!r} ignored: {reason}")
 
     def _touch_key_press(self, token: str, key: tk.Frame):
+        if self._token_disabled(token):
+            key._vk_disabled = True
+            self._set_key_bg(key, active=False)
+            self._log_touch_result(
+                token=token,
+                entry_before=self.active_entry,
+                value_before=self._safe_entry_value(self.active_entry),
+                value_after=self._safe_entry_value(self.active_entry),
+                accepted=False,
+                reason="space disabled for one-word field",
+            )
+            return "break"
+
         # Tiny duplicate guard only for the same widget/token in the same event burst.
         # It does not block normal repeated taps.
         now = time.monotonic()
@@ -478,13 +512,24 @@ class VirtualKeyboard(tk.Frame):
             )
             return "break"
 
+        entry_before = self._focused_entry()
+        if not self._entry_is_usable(entry_before):
+            self._log_touch_result(
+                token=token,
+                entry_before=entry_before,
+                value_before="",
+                value_after="",
+                accepted=False,
+                reason="no active field",
+            )
+            return "break"
+
         self._set_key_bg(key, active=True)
         try:
             key.after(80, lambda k=key: self._set_key_bg(k, active=False))
         except Exception:
             pass
 
-        entry_before = self.active_entry if self._entry_is_usable(self.active_entry) else None
         value_before = self._safe_entry_value(entry_before)
         accepted = False
         reason = ""
@@ -509,11 +554,17 @@ class VirtualKeyboard(tk.Frame):
         return "break"
 
     def _set_key_bg(self, key: tk.Frame, *, active: bool) -> None:
-        color = getattr(key, "_active_bg" if active else "_normal_bg", self.KEY_BG)
+        disabled = bool(getattr(key, "_vk_disabled", False))
+        if disabled:
+            color = getattr(key, "_disabled_bg", self.KEY_DISABLED_BG)
+        else:
+            color = getattr(key, "_active_bg" if active else "_normal_bg", self.KEY_BG)
         try:
             key.config(bg=color)
             for child in key.winfo_children():
                 child.config(bg=color)
+                if isinstance(child, tk.Label):
+                    child.config(fg=self.KEY_DISABLED_FG if disabled else self.KEY_FG)
         except Exception:
             pass
 
@@ -521,6 +572,8 @@ class VirtualKeyboard(tk.Frame):
         if token == "backspace":
             return self.backspace_pressed()
         if token == "space":
+            if self._token_disabled(token):
+                return False, "space disabled for one-word field"
             return self.insert_char(" ")
         return self.insert_char(token)
 
@@ -530,14 +583,18 @@ class VirtualKeyboard(tk.Frame):
         if self.active_entry is not None:
             self._log_warning(f"[VK] Stored active entry is unavailable: {self.active_entry}")
             self.active_entry = None
-            return None
         try:
             focused = self.winfo_toplevel().focus_get()
         except Exception:
             focused = None
         if isinstance(focused, tk.Entry):
             self.active_entry = focused
+            self._last_active_entry = focused
             return focused
+        if self._entry_is_usable(self._last_active_entry):
+            self.active_entry = self._last_active_entry
+            self._sync_mode_for_entry(self.active_entry)
+            return self.active_entry
         return None
 
     def insert_char(self, ch: str) -> tuple[bool, str]:
@@ -595,15 +652,14 @@ class VirtualKeyboard(tk.Frame):
                 return False, "active field unavailable"
 
         if one_word and ch.isspace():
-            # Ignore spaces in one-word fields without entering the sticky
-            # word-limit state. A stray space tap on the parent-name field
-            # should not make later letter taps look broken.
+            # A stray space on a one-word field should be invisible and harmless.
+            # Do not lock the field, because that makes later letter taps look broken.
             try:
                 entry._vk_word_limit_block = False
             except Exception:
                 pass
             self._after_edit(entry)
-            return False, "one-word field ignores spaces"
+            return False, "one-word field blocks spaces"
 
         if max_words and ch.isspace():
             text = self._entry_effective_text(entry)
@@ -691,6 +747,7 @@ class VirtualKeyboard(tk.Frame):
 
     def _after_edit(self, entry: tk.Entry) -> None:
         self.active_entry = entry
+        self._last_active_entry = entry
         # Do not call focus_set() here. On old resistive touchscreens/X11,
         # delayed FocusIn events from this call can override a later auto-advance
         # target such as year -> month. The stored active_entry is the source of

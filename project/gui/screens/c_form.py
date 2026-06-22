@@ -299,7 +299,8 @@ class FormScreen(tk.Frame):
     def _make_entry_field(self, parent, label: str, variable: tk.StringVar, field_key: str, entry_font, label_font) -> tk.Entry:
         frame = tk.Frame(parent, bg="white")
         frame.grid_columnconfigure(0, weight=1)
-        tk.Label(frame, text=label, bg="white", fg="#111111", font=label_font).grid(row=0, column=0, sticky="w")
+        label_widget = tk.Label(frame, text=label, bg="white", fg="#111111", font=label_font)
+        label_widget.grid(row=0, column=0, sticky="w")
         entry = tk.Entry(
             frame,
             textvariable=variable,
@@ -321,6 +322,8 @@ class FormScreen(tk.Frame):
         entry.bind("<FocusIn>", self._remember_active_entry, add=True)
         entry.bind("<ButtonPress-1>", self._remember_active_entry, add=True)
         entry.bind("<Return>", self._focus_next_required, add=True)
+        for touch_target in (frame, label_widget):
+            touch_target.bind("<ButtonPress-1>", lambda e, target=entry: self._focus_entry_from_touch(target), add=True)
         return entry
 
     def _build_date_field(self, parent, entry_font, label_font, small_label_font) -> tk.Frame:
@@ -510,6 +513,10 @@ class FormScreen(tk.Frame):
             self._show_active_entry(entry)
             if self.kbd:
                 self.kbd.set_active_entry(entry)
+
+    def _focus_entry_from_touch(self, entry: tk.Entry):
+        self._focus_entry(entry)
+        return "break"
 
     def _clear_keyboard_active(self, event=None):
         self.active_entry = None

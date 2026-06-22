@@ -31,8 +31,8 @@ def add_placeholder(entry: tk.Entry, placeholder: str):
             entry.insert(0, placeholder)
             entry.config(fg="#7a7a7a")
 
-    entry._placeholder_focus_in_id = entry.bind("<FocusIn>", on_focus_in)
-    entry._placeholder_focus_out_id = entry.bind("<FocusOut>", on_focus_out)
+    entry._placeholder_focus_in_id = entry.bind("<FocusIn>", on_focus_in, add=True)
+    entry._placeholder_focus_out_id = entry.bind("<FocusOut>", on_focus_out, add=True)
 
 
 class TouchButton(tk.Label):
