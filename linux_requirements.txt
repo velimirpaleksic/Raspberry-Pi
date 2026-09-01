@@ -1,0 +1,13 @@
+# System dependencies for Raspberry Pi project
+cups
+hplip
+printer-driver-hpcups
+
+# Minimal LibreOffice for DOCX to PDF
+libreoffice-core
+libreoffice-writer
+python3-uno
+
+# Touchscreen + input calibration
+xserver-xorg-input-libinput
+xinput-calibrator
