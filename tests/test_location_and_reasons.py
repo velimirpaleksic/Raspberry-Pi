@@ -17,6 +17,8 @@ EXPECTED_REASONS = [
     "Конкурс полицијска академија",
     "Регулисање уписнине",
     "Алиментација",
+    "Регулисање породичне пензије",
+    "Помоћ за породице 4+",
 ]
 
 
@@ -90,12 +92,15 @@ class ReasonPickerTests(unittest.TestCase):
     def test_reason_pages_are_deterministic_and_clamped(self):
         first, page, count = paginate_values(config.RAZLOZI, 0, 5)
         second, second_page, second_count = paginate_values(config.RAZLOZI, 1, 5)
+        third, third_page, third_count = paginate_values(config.RAZLOZI, 2, 5)
         past_end, clamped, _ = paginate_values(config.RAZLOZI, 99, 5)
         self.assertEqual(first, EXPECTED_REASONS[:5])
-        self.assertEqual(second, EXPECTED_REASONS[5:])
-        self.assertEqual((page, count), (0, 2))
-        self.assertEqual((second_page, second_count), (1, 2))
-        self.assertEqual((past_end, clamped), (EXPECTED_REASONS[5:], 1))
+        self.assertEqual(second, EXPECTED_REASONS[5:10])
+        self.assertEqual(third, EXPECTED_REASONS[10:])
+        self.assertEqual((page, count), (0, 3))
+        self.assertEqual((second_page, second_count), (1, 3))
+        self.assertEqual((third_page, third_count), (2, 3))
+        self.assertEqual((past_end, clamped), (EXPECTED_REASONS[10:], 2))
 
 
 if __name__ == "__main__":
