@@ -7,6 +7,7 @@ printer-driver-hpcups
 libreoffice-core
 libreoffice-writer
 python3-uno
+poppler-utils
 
 # Touchscreen + input calibration
 xserver-xorg-input-libinput

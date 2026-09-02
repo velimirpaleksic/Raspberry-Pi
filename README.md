@@ -48,6 +48,7 @@ Kod update-a installer ipak doda nove kljuceve koji nedostaju u tom realnom env 
 Podrzane komande:
 - `/help` prikazuje dostupne komande
 - `/status` prikazuje app, Telegram, slobodan prostor, internet/Wi-Fi i printer status
+- `/selftest` generise i provjerava probni DOCX/PDF, template, broj stranica, disk, internet i printer bez slanja papira na stampu; rezultat i svaku gresku salje u Telegram chat
 - `/space` prikazuje slobodan prostor na Raspberry Pi-ju
 - `/ping` provjerava da Telegram bot odgovara
 - `/network` prikazuje internet/Wi-Fi diagnostiku

@@ -18,6 +18,7 @@ from typing import Any
 
 from project.core import config
 from project.core.runtime_settings import clear_selected_printer, get_selected_printer, set_selected_printer
+from project.services.self_test import format_self_test_report, run_self_test
 from project.services.storage_cleanup import collect_storage_report, format_cleanup_summary, format_storage_report, run_cleanup
 from project.utils.logging_utils import log_error, log_info
 from project.utils.network_status import collect_network_diagnostics, reconnect_network
@@ -142,6 +143,8 @@ class TelegramControlBot:
             self._send_message(chat_id, "pong")
         elif command in ("/status", "/appstatus"):
             self._send_status(chat_id)
+        elif command in ("/selftest", "/testapp"):
+            self._start_background_command("selftest", chat_id, self._run_self_test)
         elif command == "/version":
             self._send_version(chat_id)
         elif command in ("/space", "/disk", "/storage"):
@@ -211,6 +214,7 @@ class TelegramControlBot:
                     "Uvjerenja Terminal controls:",
                     "/help - show this message",
                     "/status - app, Telegram, disk space, network and printer status",
+                    "/selftest - generate and verify DOCX/PDF and check the system without printing",
                     "/version - show current Git branch, commit and dirty state",
                     "/space - available Raspberry Pi disk space",
                     "/cleanup - delete old app-owned generated files/logs safely",
@@ -289,6 +293,11 @@ class TelegramControlBot:
         if not info.get("ready"):
             message.append(f"Reason: {info.get('ready_message') or info.get('detect_message') or 'unknown'}")
         self._send_message(chat_id, "\n".join(message))
+
+    def _run_self_test(self, chat_id: int | str | None) -> None:
+        self._send_message(chat_id, "Self-test started. No paper will be printed.")
+        report = run_self_test()
+        self._send_message(chat_id, format_self_test_report(report))
 
     def _format_time(self, timestamp: float | None) -> str:
         if not timestamp:

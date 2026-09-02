@@ -81,7 +81,7 @@ require_cmd sudo
 APT_PACKAGES=(
   python3 python3-venv python3-pip python3-tk
   rsync cups cups-bsd hplip printer-driver-hpcups
-  libreoffice-core libreoffice-writer fonts-dejavu fonts-noto-core
+  libreoffice-core libreoffice-writer poppler-utils fonts-dejavu fonts-noto-core
   libglib2.0-bin desktop-file-utils
   x11-xserver-utils xinput xserver-xorg-input-libinput xinput-calibrator
 )

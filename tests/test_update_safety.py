@@ -1,8 +1,11 @@
 import os
 import shutil
+import stat
 import subprocess
 import tempfile
+import time
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -42,6 +45,29 @@ def _bash_path(path: Path) -> str:
     drive = resolved.drive.rstrip(":").lower()
     tail = resolved.as_posix().split(":", 1)[1]
     return f"/{drive}{tail}"
+
+
+@contextmanager
+def _update_test_directory():
+    """Retry Windows cleanup while short-lived Git/Bash handles are released."""
+    def clear_readonly_and_retry(function, item, _error_info):
+        os.chmod(item, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+        function(item)
+
+    path = Path(tempfile.mkdtemp(prefix=".update-safety-", dir=PROJECT_ROOT))
+    try:
+        yield path
+    finally:
+        for attempt in range(10):
+            try:
+                shutil.rmtree(path, onerror=clear_readonly_and_retry)
+                break
+            except FileNotFoundError:
+                break
+            except PermissionError:
+                if attempt == 9:
+                    raise
+                time.sleep(0.25)
 
 
 class UpdateScriptEnvSafetyTests(unittest.TestCase):
@@ -118,9 +144,9 @@ fi
         return result, env_file, backup_dir, original, source / ".env", source_env_original
 
     def test_update_keeps_existing_values_and_allows_only_new_keys(self):
-        with tempfile.TemporaryDirectory(prefix=".update-safety-", dir=PROJECT_ROOT) as temp_dir:
+        with _update_test_directory() as temp_dir:
             result, env_file, backup_dir, original, source_env, source_env_original = self._run_update(
-                Path(temp_dir), mutate_env=False
+                temp_dir, mutate_env=False
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             updated = env_file.read_bytes()
@@ -132,9 +158,9 @@ fi
             self.assertEqual(source_env.read_bytes(), source_env_original)
 
     def test_update_rejects_changed_secret_and_restores_full_env(self):
-        with tempfile.TemporaryDirectory(prefix=".update-safety-", dir=PROJECT_ROOT) as temp_dir:
+        with _update_test_directory() as temp_dir:
             result, env_file, backup_dir, original, source_env, source_env_original = self._run_update(
-                Path(temp_dir), mutate_env=True
+                temp_dir, mutate_env=True
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Refusing env change", result.stderr)
