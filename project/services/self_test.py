@@ -14,6 +14,7 @@ from docx import Document
 
 from project.core import config
 from project.core.runtime_settings import get_selected_printer
+from project.services.print_counters import get_print_counters
 from project.services.storage_cleanup import DiskInfo, collect_storage_report, format_bytes
 from project.utils.docs.docx_replace_placeholders import replace_dynamic_text
 from project.utils.docs.pdf_converter import convert_docx_to_pdf
@@ -277,6 +278,12 @@ def run_self_test() -> SelfTestReport:
         checks.append(SelfTestCheck("Disk", storage_ok, _compact(storage_detail)))
     except Exception as exc:
         checks.append(SelfTestCheck("Disk", False, _compact(exc)))
+
+    try:
+        counter_snapshot = get_print_counters()
+        checks.append(SelfTestCheck("Brojač", True, f"čitljiv; trenutno ukupno {counter_snapshot.total}"))
+    except Exception as exc:
+        checks.append(SelfTestCheck("Brojač", False, _compact(exc)))
 
     try:
         network_ok, network_detail = _network_check()

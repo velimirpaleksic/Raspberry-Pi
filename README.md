@@ -49,6 +49,9 @@ Podrzane komande:
 - `/help` prikazuje dostupne komande
 - `/status` prikazuje app, Telegram, slobodan prostor, internet/Wi-Fi i printer status
 - `/selftest` generise i provjerava probni DOCX/PDF, template, broj stranica, disk, internet i printer bez slanja papira na stampu; rezultat i svaku gresku salje u Telegram chat
+- `/counts` prikazuje ukupan broj uspjesno predatih print poslova i broj za svaki razlog
+- `/countset BROJ_RAZLOGA VRIJEDNOST` postavlja pocetnu vrijednost, npr. `/countset 2 40`; naredne uspjesne stampe nastavljaju od 40
+- `/countreset` resetuje sve brojace, a `/countreset BROJ_RAZLOGA` samo izabrani razlog
 - `/space` prikazuje slobodan prostor na Raspberry Pi-ju
 - `/ping` provjerava da Telegram bot odgovara
 - `/network` prikazuje internet/Wi-Fi diagnostiku
@@ -67,6 +70,11 @@ Podrzane komande:
 - `/usecupsdefault` brise izbor printera u aplikaciji i koristi trenutni CUPS default
 - `/cmd KOMANDA` pokrece shell komandu iz foldera aplikacije
 - `/eval PYTHON` pokrece Python izraz ili kod u child procesu
+
+Brojaci se cuvaju odvojeno u `/var/lib/uvjerenja-terminal/print_counters.json` i prezivljavaju update aplikacije.
+Ne sadrze ime niti druge podatke ucenika, samo zbir po razlogu i ID posljednjih poslova radi zastite od dvostrukog brojanja.
+Brojac se povecava tek kada CUPS prihvati stvarni print posao; neuspjela stampa, samo generisanje dokumenta i `/selftest` ne mijenjaju vrijednosti.
+Nakon uspjesne stampe Telegram poruka prikazuje novi broj za taj razlog i ukupan broj.
 
 Telegram `/update` je podesen kroz `.env` da pokrece `bash ./update_uvjerenja_terminal.sh`.
 Taj script pull-a iz:

@@ -9,6 +9,7 @@ from project.gui import screen_ids
 from project.gui.screen_manager import ScreenManager
 from project.gui.screens.e_printing import ERROR_RETURN_SECONDS, PrintingScreen
 from project.services import print_job
+from project.services.print_counters import CounterSnapshot
 from project.utils.printing import printer_status
 
 
@@ -91,6 +92,7 @@ class PrintServiceReliabilityTests(unittest.TestCase):
                 patch.object(print_job, "_resolve_ready_printer_for_job", side_effect=unavailable_printer),
                 patch.object(print_job, "_notify_job_failure"),
                 patch.object(print_job, "check_storage_pressure_async"),
+                patch.object(print_job, "increment_print_counter") as counter,
             ):
                 result = print_job.run_print_job(valid_form_data(), do_print=True)
 
@@ -99,6 +101,7 @@ class PrintServiceReliabilityTests(unittest.TestCase):
             self.assertEqual(order, ["pdf", "printer"])
             self.assertTrue(Path(result.docx_path).is_file())
             self.assertTrue(Path(result.pdf_path).is_file())
+            counter.assert_not_called()
 
     def test_telegram_and_status_callback_failures_do_not_change_success(self):
         order = []
@@ -116,9 +119,11 @@ class PrintServiceReliabilityTests(unittest.TestCase):
                 patch.object(print_job, "_notify_job_success", side_effect=OSError("offline")),
                 patch.object(print_job, "check_storage_pressure_async", side_effect=RuntimeError("busy")),
                 patch.object(print_job, "log_error"),
+                patch.object(print_job, "increment_print_counter") as counter,
             ):
                 result = print_job.run_print_job(valid_form_data(), on_status=broken_status, do_print=False)
         self.assertTrue(result.ok)
+        counter.assert_not_called()
 
     def test_post_completion_bookkeeping_failure_does_not_invite_duplicate_print(self):
         order = []
@@ -154,10 +159,47 @@ class PrintServiceReliabilityTests(unittest.TestCase):
                 patch.object(print_job, "_notify_job_success"),
                 patch.object(print_job, "check_storage_pressure_async"),
                 patch.object(print_job, "log_error"),
+                patch.object(
+                    print_job,
+                    "increment_print_counter",
+                    return_value=CounterSnapshot({"Превоз": 11}),
+                ) as counter,
             ):
                 result = print_job.run_print_job(valid_form_data(), do_print=True)
         self.assertTrue(result.ok)
         print_command.assert_called_once()
+        counter.assert_called_once()
+        self.assertEqual(counter.call_args.args[0], "Превоз")
+        self.assertTrue(counter.call_args.kwargs["job_id"])
+
+    def test_counter_failure_after_accepted_print_is_best_effort(self):
+        payload = {"form_data": {"razlog": "Превоз"}}
+        with (
+            patch.object(print_job, "increment_print_counter", side_effect=OSError("disk read-only")),
+            patch.object(print_job, "notify_telegram_async") as notify,
+            patch.object(print_job, "log_error"),
+        ):
+            print_job._record_successful_print("job-1", payload)
+        self.assertIn("counter_error", payload)
+        notify.assert_called_once()
+        self.assertEqual(notify.call_args.kwargs["kind"], "error")
+
+    def test_success_telegram_message_contains_reason_and_total_counts(self):
+        payload = {
+            "form_data": valid_form_data(),
+            "printed": True,
+            "printer_name": "USBPrinter",
+            "reason_print_count": 8,
+            "total_print_count": 21,
+        }
+        with (
+            patch.object(print_job.config, "TELEGRAM_NOTIFY_PRINT_JOBS", True),
+            patch.object(print_job, "notify_telegram_async") as notify,
+        ):
+            print_job._notify_job_success("job-1", payload)
+        message = notify.call_args.args[0]
+        self.assertIn("Број за овај разлог: 8", message)
+        self.assertIn("Укупно одштампано: 21", message)
 
     def test_usb_device_check_does_not_require_network(self):
         with patch.object(printer_status.socket, "create_connection") as create_connection:

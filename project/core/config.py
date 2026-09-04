@@ -113,6 +113,7 @@ def _ensure_dir(path: Path) -> Path:
 VAR_DIR = _ensure_dir(Path(_env("POTVRDE_VAR_DIR", f"/var/lib/{APP_ID}")))
 JOBS_DIR = _ensure_dir(VAR_DIR / "jobs")
 SETTINGS_FILE = VAR_DIR / "settings.json"
+PRINT_COUNTERS_FILE = VAR_DIR / "print_counters.json"
 
 PRINTER_NAME = _env("POTVRDE_PRINTER_NAME", "")
 TEMPLATE_FILE = Path(_env("POTVRDE_TEMPLATE_PATH", str(PROJECT_ROOT / "docs" / "template.docx")))

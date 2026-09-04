@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from project.services import self_test
+from project.services.print_counters import CounterSnapshot
 from project.services.self_test import SelfTestCheck, SelfTestReport, format_self_test_report, run_self_test
 from project.services.storage_cleanup import DiskInfo
 from project.services.telegram_bot import TelegramControlBot
@@ -38,6 +39,7 @@ class SelfTestServiceTests(unittest.TestCase):
                     return_value={"ready": True, "resolved": "USB_Printer"},
                 ),
                 patch.object(self_test, "collect_storage_report", return_value=healthy_storage),
+                patch.object(self_test, "get_print_counters", return_value=CounterSnapshot({"Превоз": 4})),
                 patch.object(
                     self_test,
                     "collect_network_diagnostics",

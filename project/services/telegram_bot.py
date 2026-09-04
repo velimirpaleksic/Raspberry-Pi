@@ -18,6 +18,14 @@ from typing import Any
 
 from project.core import config
 from project.core.runtime_settings import clear_selected_printer, get_selected_printer, set_selected_printer
+from project.services.print_counters import (
+    CounterStoreError,
+    format_print_counters,
+    get_print_counters,
+    reset_print_counters,
+    resolve_reason_selector,
+    set_print_counter,
+)
 from project.services.self_test import format_self_test_report, run_self_test
 from project.services.storage_cleanup import collect_storage_report, format_cleanup_summary, format_storage_report, run_cleanup
 from project.utils.logging_utils import log_error, log_info
@@ -145,6 +153,12 @@ class TelegramControlBot:
             self._send_status(chat_id)
         elif command in ("/selftest", "/testapp"):
             self._start_background_command("selftest", chat_id, self._run_self_test)
+        elif command in ("/counts", "/counter", "/printcounts"):
+            self._send_print_counters(chat_id)
+        elif command in ("/countset", "/setcount"):
+            self._set_print_counter(chat_id, argument)
+        elif command in ("/countreset", "/resetcount"):
+            self._reset_print_counter(chat_id, argument)
         elif command == "/version":
             self._send_version(chat_id)
         elif command in ("/space", "/disk", "/storage"):
@@ -215,6 +229,9 @@ class TelegramControlBot:
                     "/help - show this message",
                     "/status - app, Telegram, disk space, network and printer status",
                     "/selftest - generate and verify DOCX/PDF and check the system without printing",
+                    "/counts - show successful print counts for every reason",
+                    "/countset <reason-number> <value> - set a counter value",
+                    "/countreset [reason-number] - reset one counter, or all when omitted",
                     "/version - show current Git branch, commit and dirty state",
                     "/space - available Raspberry Pi disk space",
                     "/cleanup - delete old app-owned generated files/logs safely",
@@ -298,6 +315,63 @@ class TelegramControlBot:
         self._send_message(chat_id, "Self-test started. No paper will be printed.")
         report = run_self_test()
         self._send_message(chat_id, format_self_test_report(report))
+
+    def _send_print_counters(self, chat_id: int | str | None) -> None:
+        try:
+            self._send_message(chat_id, format_print_counters(get_print_counters()))
+        except CounterStoreError as exc:
+            log_error(f"[Telegram] Could not read print counters: {exc}")
+            self._send_message(chat_id, f"Brojač se ne može pročitati.\n{exc}")
+
+    def _set_print_counter(self, chat_id: int | str | None, argument: str) -> None:
+        parts = argument.split()
+        if len(parts) != 2:
+            self._send_message(chat_id, "Upotreba: /countset <redni-broj-razloga> <vrijednost>\nRedne brojeve vidi sa /counts.")
+            return
+        selector, raw_value = parts
+        try:
+            value = int(raw_value)
+            if value < 0:
+                raise ValueError
+        except ValueError:
+            self._send_message(chat_id, "Vrijednost mora biti cijeli broj 0 ili veći.")
+            return
+
+        try:
+            reason = resolve_reason_selector(selector)
+            snapshot = set_print_counter(reason, value)
+            self._send_message(
+                chat_id,
+                "\n".join(
+                    [
+                        "Brojač je postavljen.",
+                        f"Razlog: {reason}",
+                        f"Nova vrijednost: {snapshot.count_for(reason)}",
+                        f"Ukupno: {snapshot.total}",
+                    ]
+                ),
+            )
+        except CounterStoreError as exc:
+            log_error(f"[Telegram] Could not set print counter: {exc}")
+            self._send_message(chat_id, f"Brojač nije promijenjen.\n{exc}")
+
+    def _reset_print_counter(self, chat_id: int | str | None, argument: str) -> None:
+        selector = argument.strip()
+        try:
+            if not selector or selector.casefold() in {"all", "sve"}:
+                snapshot = reset_print_counters()
+                self._send_message(chat_id, f"Svi brojači su resetovani na 0.\nUkupno: {snapshot.total}")
+                return
+
+            reason = resolve_reason_selector(selector)
+            snapshot = reset_print_counters(reason)
+            self._send_message(
+                chat_id,
+                f"Brojač je resetovan.\nRazlog: {reason}\nVrijednost: {snapshot.count_for(reason)}\nUkupno: {snapshot.total}",
+            )
+        except CounterStoreError as exc:
+            log_error(f"[Telegram] Could not reset print counter: {exc}")
+            self._send_message(chat_id, f"Brojač nije resetovan.\n{exc}")
 
     def _format_time(self, timestamp: float | None) -> str:
         if not timestamp:

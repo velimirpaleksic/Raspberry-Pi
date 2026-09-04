@@ -11,6 +11,7 @@ from typing import Callable, Dict, Optional
 from project.core import config
 from project.core.location_rules import municipality_for_place
 from project.core.runtime_settings import get_selected_printer
+from project.services.print_counters import increment_print_counter
 from project.services.storage_cleanup import cleanup_print_job_documents, check_storage_pressure_async, format_bytes
 from project.services.telegram_notify import notify_telegram_async
 from project.utils.docs.docx_replace_placeholders import replace_dynamic_text, value_fits_placeholder
@@ -145,8 +146,44 @@ def _notify_job_success(job_id: str, payload: Dict) -> None:
     bytes_freed = int(payload.get("cleanup_bytes_freed") or 0)
     if bytes_freed:
         lines.append(f"Ослобођено: {format_bytes(bytes_freed)}")
+    reason_count = payload.get("reason_print_count")
+    total_count = payload.get("total_print_count")
+    if printed and isinstance(reason_count, int) and isinstance(total_count, int):
+        lines.extend(
+            [
+                "",
+                f"Број за овај разлог: {reason_count}",
+                f"Укупно одштампано: {total_count}",
+            ]
+        )
 
     notify_telegram_async("\n".join(lines), kind="status")
+
+
+def _record_successful_print(job_id: str, payload: Dict) -> None:
+    reason = str((payload.get("form_data") or {}).get("razlog") or "").strip()
+    try:
+        snapshot = increment_print_counter(reason, job_id=job_id)
+        payload["reason_print_count"] = snapshot.count_for(reason)
+        payload["total_print_count"] = snapshot.total
+    except Exception as exc:
+        payload["counter_error"] = repr(exc)
+        log_error(f"[COUNTER] {job_id} print was accepted but counter update failed: {exc}")
+        try:
+            notify_telegram_async(
+                "\n".join(
+                    [
+                        "Uvjerenja Terminal counter error.",
+                        f"Job: {job_id}",
+                        f"Reason: {reason or '-'}",
+                        "Print was accepted, but its counter could not be saved.",
+                        f"Detail: {str(exc)[:1000]}",
+                    ]
+                ),
+                kind="error",
+            )
+        except Exception as notify_exc:
+            log_error(f"[COUNTER] {job_id} could not queue counter error notification: {notify_exc}")
 
 
 def _fail(job_dir: Path, payload: Dict, job_id: str, error_code: str, user_message: str, detail: str = "", *, docx_path: str | None = None, pdf_path: str | None = None) -> PrintResult:
@@ -403,6 +440,7 @@ def _run_print_job_impl(
                     pdf_path=str(pdf_path),
                 )
             printed = True
+            _record_successful_print(job_id, payload)
             payload["printer_name"] = print_result.printer_name
             if print_result.detail:
                 payload["lp_output"] = print_result.detail
