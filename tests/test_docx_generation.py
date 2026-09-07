@@ -14,7 +14,11 @@ from project.utils.docs.docx_replace_placeholders import replace_dynamic_text, v
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = PROJECT_ROOT / "project" / "docs" / "template.docx"
 BACKUP = PROJECT_ROOT / "project" / "docs" / "template.2025-2026.original.backup.docx"
+SECRETARY_BACKUP = PROJECT_ROOT / "project" / "docs" / "template.before-secretary-suzana-jokic.backup.docx"
 ORIGINAL_SHA256 = "F2A99E1FEAF7827D81E226151470495135789412F442B9FA63B6C4B546C71E2B"
+PRE_SECRETARY_SHA256 = "61FD522093EF16ADBDDA5F7A035C2B03A4A440B0E8B5065F243B29826B410C32"
+OLD_SECRETARY_NAME = "Драгана Стојановић"
+SECRETARY_NAME = "Сузана Јокић"
 STUDENT_CAPTION = "                 (име и презиме ученика-це)                              (име  родитеља)"
 
 
@@ -56,6 +60,31 @@ class TemplateIntegrityTests(unittest.TestCase):
             self.assertEqual(sum(new_zip.read(name).count(b"2025/2026") for name in new_zip.namelist()), 0)
             self.assertEqual(sum(new_zip.read(name).count(b"2026/2027") for name in new_zip.namelist()), 1)
 
+    def test_secretary_name_change_is_an_exact_ooxml_replacement(self):
+        self.assertEqual(
+            hashlib.sha256(SECRETARY_BACKUP.read_bytes()).hexdigest().upper(),
+            PRE_SECRETARY_SHA256,
+        )
+        with ZipFile(SECRETARY_BACKUP) as old_zip, ZipFile(TEMPLATE) as new_zip:
+            self.assertIsNone(old_zip.testzip())
+            self.assertIsNone(new_zip.testzip())
+            self.assertEqual(old_zip.namelist(), new_zip.namelist())
+            changed = [
+                name
+                for name in old_zip.namelist()
+                if old_zip.read(name) != new_zip.read(name)
+            ]
+            self.assertEqual(changed, ["word/document.xml"])
+            old_xml = old_zip.read("word/document.xml")
+            new_xml = new_zip.read("word/document.xml")
+            old_name = OLD_SECRETARY_NAME.encode("utf-8")
+            new_name = SECRETARY_NAME.encode("utf-8")
+            self.assertEqual(old_xml.count(old_name), 1)
+            self.assertEqual(old_xml.count(new_name), 0)
+            self.assertEqual(new_xml, old_xml.replace(old_name, new_name, 1))
+            self.assertEqual(new_xml.count(old_name), 0)
+            self.assertEqual(new_xml.count(new_name), 1)
+
     def test_template_structure_and_static_student_caption_are_preserved(self):
         old_doc = Document(BACKUP)
         new_doc = Document(TEMPLATE)
@@ -67,8 +96,10 @@ class TemplateIntegrityTests(unittest.TestCase):
             for i, (old_para, new_para) in enumerate(zip(old_doc.paragraphs, new_doc.paragraphs))
             if old_para.text != new_para.text
         ]
-        self.assertEqual(changed, [13])
+        self.assertEqual(changed, [13, 28])
         self.assertEqual(new_doc.paragraphs[13].text.count("2026/2027"), 1)
+        self.assertIn(f"{SECRETARY_NAME}, дипл. правник", new_doc.paragraphs[28].text)
+        self.assertNotIn(OLD_SECRETARY_NAME, new_doc.paragraphs[28].text)
 
 
 class GeneratedDocumentTests(unittest.TestCase):
@@ -89,6 +120,7 @@ class GeneratedDocumentTests(unittest.TestCase):
             self.assertEqual(generated.paragraphs[7].text, STUDENT_CAPTION)
             self.assertIn("2026/2027", generated.paragraphs[13].text)
             self.assertIn("АЛЕКСАНДАР\u00a0МАКСИМИЛИЈАН\u00a0ПЕТРОВИЋ", generated.paragraphs[5].text)
+            self.assertIn(f"{SECRETARY_NAME}, дипл. правник", generated.paragraphs[28].text)
 
     def test_every_configured_reason_and_longest_profession_fit(self):
         self.assertTrue(all(value_fits_placeholder("{{RAZLOG}}", reason) for reason in config.RAZLOZI))
