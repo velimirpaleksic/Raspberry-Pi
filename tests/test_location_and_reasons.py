@@ -11,15 +11,18 @@ EXPECTED_REASONS = [
     "Отварање рачуна у банци",
     "Здравствено осигурање",
     "Превоз",
-    "Стипендију брата/сестре",
     "Новчана средства за уџбенике",
     "Давање изјаве у полицији",
     "Конкурс полицијска академија",
-    "Регулисање уписнине",
-    "Алиментација",
+    "Дјечији доплатак",
+    "Стипендија",
+    "Статусна питања",
+    "Туђа њега и помоћ",
     "Регулисање породичне пензије",
     "Помоћ за породице 4+",
-    "Туђа њега и помоћ",
+    "Алиментација",
+    "Стипендију брата/сестре",
+    "Регулисање уписнине",
 ]
 
 
@@ -94,14 +97,17 @@ class ReasonPickerTests(unittest.TestCase):
         first, page, count = paginate_values(config.RAZLOZI, 0, 5)
         second, second_page, second_count = paginate_values(config.RAZLOZI, 1, 5)
         third, third_page, third_count = paginate_values(config.RAZLOZI, 2, 5)
+        fourth, fourth_page, fourth_count = paginate_values(config.RAZLOZI, 3, 5)
         past_end, clamped, _ = paginate_values(config.RAZLOZI, 99, 5)
         self.assertEqual(first, EXPECTED_REASONS[:5])
         self.assertEqual(second, EXPECTED_REASONS[5:10])
-        self.assertEqual(third, EXPECTED_REASONS[10:])
-        self.assertEqual((page, count), (0, 3))
-        self.assertEqual((second_page, second_count), (1, 3))
-        self.assertEqual((third_page, third_count), (2, 3))
-        self.assertEqual((past_end, clamped), (EXPECTED_REASONS[10:], 2))
+        self.assertEqual(third, EXPECTED_REASONS[10:15])
+        self.assertEqual(fourth, EXPECTED_REASONS[15:])
+        self.assertEqual((page, count), (0, 4))
+        self.assertEqual((second_page, second_count), (1, 4))
+        self.assertEqual((third_page, third_count), (2, 4))
+        self.assertEqual((fourth_page, fourth_count), (3, 4))
+        self.assertEqual((past_end, clamped), (EXPECTED_REASONS[15:], 3))
 
 
 if __name__ == "__main__":
