@@ -14,6 +14,7 @@ from docx import Document
 
 from project.core import config
 from project.core.runtime_settings import get_selected_printer
+from project.core.school_year import current_school_year
 from project.services.print_counters import get_print_counters
 from project.services.storage_cleanup import DiskInfo, collect_storage_report, format_bytes
 from project.utils.docs.docx_replace_placeholders import replace_dynamic_text
@@ -33,6 +34,7 @@ REQUIRED_PLACEHOLDERS = (
     "{{RAZRED}}",
     "{{STRUKA}}",
     "{{RAZLOG}}",
+    "{{SKGOD}}",
 )
 
 
@@ -104,9 +106,9 @@ def _validate_template(path: Path) -> str:
     missing = [placeholder for placeholder in REQUIRED_PLACEHOLDERS if placeholder not in text]
     if missing:
         raise ValueError("nedostaju placeholderi: " + ", ".join(missing))
-    if text.count("2026/2027") != 1 or "2025/2026" in text:
-        raise ValueError("školska godina u templateu nije tačno 2026/2027")
-    return f"validan DOCX/OOXML, {len(REQUIRED_PLACEHOLDERS)} obaveznih polja, školska 2026/2027"
+    if text.count("{{SKGOD}}") != 1:
+        raise ValueError("template nema tačno jedan placeholder za školsku godinu")
+    return f"validan DOCX/OOXML, {len(REQUIRED_PLACEHOLDERS)} obaveznih polja, dinamička školska godina"
 
 
 def _sample_placeholders() -> dict[str, str]:
@@ -123,6 +125,7 @@ def _sample_placeholders() -> dict[str, str]:
         "{{RAZRED}}": "ЧЕТВРТИ",
         "{{STRUKA}}": max(config.STRUKE, key=len).upper(),
         "{{RAZLOG}}": max(config.RAZLOZI, key=len).upper(),
+        "{{SKGOD}}": current_school_year(),
     }
 
 
@@ -133,7 +136,7 @@ def _validate_generated_docx(path: Path) -> str:
     unresolved = sorted(set(re.findall(r"\{\{[^{}]+\}\}", text)))
     if unresolved:
         raise ValueError("neriješeni placeholderi: " + ", ".join(unresolved))
-    if "2026/2027" not in text:
+    if current_school_year() not in text:
         raise ValueError("školska godina nedostaje u generisanom dokumentu")
     return f"generisan i ponovo otvoren, bez placeholdera ({format_bytes(path.stat().st_size)})"
 

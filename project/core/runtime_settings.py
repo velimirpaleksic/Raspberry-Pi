@@ -28,6 +28,22 @@ def _write_settings_unlocked(settings: dict[str, Any]) -> None:
     tmp_path = Path(str(config.SETTINGS_FILE) + ".tmp")
     tmp_path.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
     tmp_path.replace(config.SETTINGS_FILE)
+    try:
+        config.SETTINGS_FILE.chmod(0o600)
+    except OSError:
+        pass
+
+
+def get_setting(name: str, default: Any = None) -> Any:
+    with _LOCK:
+        return _read_settings_unlocked().get(name, default)
+
+
+def set_setting(name: str, value: Any) -> None:
+    with _LOCK:
+        settings = _read_settings_unlocked()
+        settings[str(name)] = value
+        _write_settings_unlocked(settings)
 
 
 def get_selected_printer() -> str:

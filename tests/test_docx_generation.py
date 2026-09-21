@@ -8,6 +8,7 @@ from zipfile import ZipFile
 from docx import Document
 
 from project.core import config
+from project.core.school_year import current_school_year
 from project.utils.docs.docx_replace_placeholders import replace_dynamic_text, value_fits_placeholder
 
 
@@ -15,6 +16,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = PROJECT_ROOT / "project" / "docs" / "template.docx"
 BACKUP = PROJECT_ROOT / "project" / "docs" / "template.2025-2026.original.backup.docx"
 SECRETARY_BACKUP = PROJECT_ROOT / "project" / "docs" / "template.before-secretary-suzana-jokic.backup.docx"
+DYNAMIC_YEAR_BACKUP = PROJECT_ROOT / "project" / "docs" / "template.before-dynamic-school-year.backup.docx"
 ORIGINAL_SHA256 = "F2A99E1FEAF7827D81E226151470495135789412F442B9FA63B6C4B546C71E2B"
 PRE_SECRETARY_SHA256 = "61FD522093EF16ADBDDA5F7A035C2B03A4A440B0E8B5065F243B29826B410C32"
 OLD_SECRETARY_NAME = "Драгана Стојановић"
@@ -36,6 +38,7 @@ def sample_placeholders():
         "{{RAZRED}}": "IV-1",
         "{{STRUKA}}": max(config.STRUKE, key=len).upper(),
         "{{RAZLOG}}": max(config.RAZLOZI, key=len).upper(),
+        "{{SKGOD}}": current_school_year(),
     }
 
 
@@ -55,10 +58,22 @@ class TemplateIntegrityTests(unittest.TestCase):
             new_xml = new_zip.read("word/document.xml")
             self.assertEqual(old_xml.count(b"2025/2026"), 1)
             self.assertEqual(new_xml.count(b"2025/2026"), 0)
-            self.assertEqual(new_xml.count(b"2026/2027"), 1)
+            self.assertEqual(new_xml.count(b"{{SKGOD}}"), 1)
             self.assertEqual(sum(old_zip.read(name).count(b"2025/2026") for name in old_zip.namelist()), 1)
             self.assertEqual(sum(new_zip.read(name).count(b"2025/2026") for name in new_zip.namelist()), 0)
-            self.assertEqual(sum(new_zip.read(name).count(b"2026/2027") for name in new_zip.namelist()), 1)
+            self.assertEqual(sum(new_zip.read(name).count(b"{{SKGOD}}") for name in new_zip.namelist()), 1)
+
+    def test_dynamic_year_change_is_an_exact_ooxml_replacement(self):
+        self.assertEqual(
+            hashlib.sha256(DYNAMIC_YEAR_BACKUP.read_bytes()).hexdigest().upper(),
+            "96DE39537FF506C6219B4B8D4D4E443102CAF39662F461920C1074E3824EB4C5",
+        )
+        with ZipFile(DYNAMIC_YEAR_BACKUP) as old_zip, ZipFile(TEMPLATE) as new_zip:
+            changed = [name for name in old_zip.namelist() if old_zip.read(name) != new_zip.read(name)]
+            self.assertEqual(changed, ["word/document.xml"])
+            old_xml = old_zip.read("word/document.xml")
+            new_xml = new_zip.read("word/document.xml")
+            self.assertEqual(new_xml, old_xml.replace(b"2026/2027", b"{{SKGOD}}", 1))
 
     def test_secretary_name_change_is_an_exact_ooxml_replacement(self):
         self.assertEqual(
@@ -81,7 +96,8 @@ class TemplateIntegrityTests(unittest.TestCase):
             new_name = SECRETARY_NAME.encode("utf-8")
             self.assertEqual(old_xml.count(old_name), 1)
             self.assertEqual(old_xml.count(new_name), 0)
-            self.assertEqual(new_xml, old_xml.replace(old_name, new_name, 1))
+            expected = old_xml.replace(old_name, new_name, 1).replace(b"2026/2027", b"{{SKGOD}}", 1)
+            self.assertEqual(new_xml, expected)
             self.assertEqual(new_xml.count(old_name), 0)
             self.assertEqual(new_xml.count(new_name), 1)
 
@@ -97,7 +113,7 @@ class TemplateIntegrityTests(unittest.TestCase):
             if old_para.text != new_para.text
         ]
         self.assertEqual(changed, [13, 28])
-        self.assertEqual(new_doc.paragraphs[13].text.count("2026/2027"), 1)
+        self.assertEqual(new_doc.paragraphs[13].text.count("{{SKGOD}}"), 1)
         self.assertIn(f"{SECRETARY_NAME}, дипл. правник", new_doc.paragraphs[28].text)
         self.assertNotIn(OLD_SECRETARY_NAME, new_doc.paragraphs[28].text)
 
@@ -118,7 +134,7 @@ class GeneratedDocumentTests(unittest.TestCase):
             generated = Document(output)
             self.assertEqual(len(generated.paragraphs), 31)
             self.assertEqual(generated.paragraphs[7].text, STUDENT_CAPTION)
-            self.assertIn("2026/2027", generated.paragraphs[13].text)
+            self.assertIn(current_school_year(), generated.paragraphs[13].text)
             self.assertIn("АЛЕКСАНДАР\u00a0МАКСИМИЛИЈАН\u00a0ПЕТРОВИЋ", generated.paragraphs[5].text)
             self.assertIn(f"{SECRETARY_NAME}, дипл. правник", generated.paragraphs[28].text)
 

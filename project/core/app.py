@@ -30,6 +30,7 @@ def main() -> int:
         from project.gui.screens.d_review import ReviewScreen
         from project.gui.screens.e_printing import PrintingScreen
         from project.gui.screens.f_done import DoneScreen
+        from project.gui.screens.g_admin import AdminScreen
         from project.services.storage_cleanup import start_periodic_cleanup
         from project.services.telegram_bot import start_telegram_control_bot
 
@@ -41,6 +42,7 @@ def main() -> int:
         manager.add_frame(screen_ids.REVIEW, ReviewScreen, manager=manager)
         manager.add_frame(screen_ids.PRINTING, PrintingScreen, manager=manager)
         manager.add_frame(screen_ids.DONE, DoneScreen, manager=manager)
+        manager.add_frame(screen_ids.ADMIN, AdminScreen, manager=manager)
         try:
             telegram_bot = start_telegram_control_bot(manager=manager)
             cleanup_service = start_periodic_cleanup()

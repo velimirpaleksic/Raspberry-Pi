@@ -59,6 +59,20 @@ class StartScreen(tk.Frame):
             )
             self.closed_label.pack(pady=(20, 0))
             self.closed_label.bind("<ButtonPress-1>", self._start_from_anywhere, add=True)
+
+            admin_btn = TouchButton(
+                container,
+                text="ADMIN",
+                command=self.goto_admin,
+                font=("Arial", 16, "bold"),
+                fg="white",
+                bg="#183b5b",
+                activebackground="#24577f",
+                activeforeground="white",
+                padx=22,
+                pady=12,
+            )
+            admin_btn.place(relx=0.97, rely=0.95, anchor="se")
         except Exception as e:
             log_error(f"Failed to build 'StartScreen' UI elements: {e}")
 
@@ -90,3 +104,8 @@ class StartScreen(tk.Frame):
                 self.manager.show_frame(screen_ids.FORM)
         except Exception as e:
             log_error(f"Failed to initialize form screen: {e}")
+
+    def goto_admin(self):
+        if self.manager:
+            self.manager.state["admin_return_screen"] = screen_ids.START
+            self.manager.show_frame(screen_ids.ADMIN)

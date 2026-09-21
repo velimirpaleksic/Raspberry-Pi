@@ -82,6 +82,12 @@ class VirtualKeyboard(tk.Frame):
         ["џ", "ц", "в", "б", "н", "м", "ђ", "ж", "backspace"],
         ["space"],
     ]
+    LATIN_ROWS = [
+        list("qwertyuiop"),
+        list("asdfghjkl"),
+        ["z", "x", "c", "v", "b", "n", "m", "backspace"],
+        ["space"],
+    ]
     NUMERIC_ROWS = [
         ["1", "2", "3"],
         ["4", "5", "6"],
@@ -105,6 +111,7 @@ class VirtualKeyboard(tk.Frame):
         target_width: int | None = None,
         target_height: int | None = None,
         bg: str = DOCK_BG,
+        alphabet: str = "cyrillic",
         **kwargs,
     ):
         super().__init__(parent, relief="flat", bd=0, padx=0, pady=0, bg=bg, cursor="none", takefocus=0, **kwargs)
@@ -115,6 +122,7 @@ class VirtualKeyboard(tk.Frame):
         self._last_active_entry: tk.Entry | None = None
         self.mode = "alpha"
         self.force_uppercase = True
+        self.alphabet = "latin" if alphabet == "latin" else "cyrillic"
         self._keys: list[tk.Widget] = []
         self._entry_callbacks: dict[tk.Entry, Callable[[tk.Entry], None]] = {}
         self._last_press: tuple[str, float] | None = None
@@ -151,10 +159,12 @@ class VirtualKeyboard(tk.Frame):
         max_words: int | None = None,
         on_change: Callable[[tk.Entry], None] | None = None,
         placeholder: str | None = None,
+        allow_numeric: bool = False,
     ) -> None:
         requested_mode = mode if mode in {"alpha", "numeric"} else "alpha"
         field_key = getattr(entry, "field_key", "")
-        if requested_mode == "numeric" and field_key not in self.NUMERIC_FIELD_KEYS:
+        entry._vk_allow_numeric = bool(allow_numeric)
+        if requested_mode == "numeric" and field_key not in self.NUMERIC_FIELD_KEYS and not entry._vk_allow_numeric:
             self._log_warning(
                 f"[VK] Ignoring numeric keyboard mode for non-date field {field_key or entry!s}; using alpha instead"
             )
@@ -232,7 +242,7 @@ class VirtualKeyboard(tk.Frame):
         try:
             mode = getattr(entry, "_vk_mode", "alpha")
             field_key = self._field_key_for_entry(entry)
-            if mode == "numeric" and field_key not in self.NUMERIC_FIELD_KEYS:
+            if mode == "numeric" and field_key not in self.NUMERIC_FIELD_KEYS and not bool(getattr(entry, "_vk_allow_numeric", False)):
                 self._log_warning(
                     f"[VK] Refusing numeric keyboard for non-date field {field_key or self._entry_description(entry)}; using alpha"
                 )
@@ -272,7 +282,7 @@ class VirtualKeyboard(tk.Frame):
         return "" if placeholder and text == placeholder else text
 
     def _build_alpha_keyboard(self) -> None:
-        self._build_keyboard(self.ALPHA_ROWS, alpha=True)
+        self._build_keyboard(self.LATIN_ROWS if self.alphabet == "latin" else self.ALPHA_ROWS, alpha=True)
 
     def _build_numeric_keyboard(self) -> None:
         self._build_keyboard(self.NUMERIC_ROWS, alpha=False)
@@ -603,7 +613,7 @@ class VirtualKeyboard(tk.Frame):
             return False, "no active field"
 
         field_key = self._field_key_for_entry(entry)
-        if self.mode == "numeric" and field_key not in self.NUMERIC_FIELD_KEYS:
+        if self.mode == "numeric" and field_key not in self.NUMERIC_FIELD_KEYS and not bool(getattr(entry, "_vk_allow_numeric", False)):
             self._log_warning(
                 f"[VK] Numeric key {ch!r} blocked for non-date field {field_key or self._entry_description(entry)}"
             )

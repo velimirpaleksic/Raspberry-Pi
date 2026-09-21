@@ -117,6 +117,10 @@ PRINT_COUNTERS_FILE = VAR_DIR / "print_counters.json"
 
 PRINTER_NAME = _env("POTVRDE_PRINTER_NAME", "")
 TEMPLATE_FILE = Path(_env("POTVRDE_TEMPLATE_PATH", str(PROJECT_ROOT / "docs" / "template.docx")))
+ADMIN_PASSWORD_HASH = _env(
+    "POTVRDE_ADMIN_PASSWORD_HASH",
+    "pbkdf2_sha256:310000:75766a6572656e6a612d61646d696e21:227ece75def6723c90ab3b7ba22e4a3d68a986e51d62c54f02cc9614f03e53fa",
+)
 
 
 def danasnji_datum() -> str:

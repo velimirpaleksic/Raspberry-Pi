@@ -102,6 +102,26 @@ class TelegramSelfTestCommandTests(unittest.TestCase):
         self.assertIn("GREŠKA", bot._send_message.call_args_list[1].args[1])
         self.assertIn("PRN_OFFLINE", bot._send_message.call_args_list[1].args[1])
 
+    def test_admin_password_command_is_authorized_and_does_not_echo_secret(self):
+        bot = TelegramControlBot()
+        user_id = int(bot.allowed_user_id)
+        update = {
+            "message": {
+                "from": {"id": user_id},
+                "chat": {"id": user_id},
+                "text": "/setadminpassword novasigurnalozinka",
+            }
+        }
+        with (
+            patch("project.services.telegram_bot.set_admin_password", return_value=(True, "")) as setter,
+            patch.object(bot, "_send_message") as send,
+        ):
+            bot._handle_update(update)
+        setter.assert_called_once_with("novasigurnalozinka")
+        response = send.call_args.args[1]
+        self.assertIn("uspješno", response)
+        self.assertNotIn("novasigurnalozinka", response)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -173,6 +173,8 @@ fi
         self.assertNotIn("replace_env_setting", installer)
         self.assertIn("Existing env values are configuration owned", installer)
         self.assertIn("--exclude '.env'", installer)
+        self.assertIn('ensure_env_setting "POTVRDE_ADMIN_PASSWORD_HASH"', installer)
+        self.assertEqual(installer.count('ensure_env_setting "POTVRDE_ADMIN_PASSWORD_HASH"'), 1)
 
 
 class TelegramRollbackSafetyTests(unittest.TestCase):

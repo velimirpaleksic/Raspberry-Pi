@@ -11,6 +11,7 @@ from typing import Callable, Dict, Optional
 from project.core import config
 from project.core.location_rules import municipality_for_place
 from project.core.runtime_settings import get_selected_printer
+from project.core.school_year import current_school_year
 from project.services.print_counters import increment_print_counter
 from project.services.storage_cleanup import cleanup_print_job_documents, check_storage_pressure_async, format_bytes
 from project.services.telegram_notify import notify_telegram_async
@@ -363,6 +364,7 @@ def _run_print_job_impl(
             "{{RAZRED}}": _docx_caps(form_data["razred"]),
             "{{STRUKA}}": _docx_caps(form_data["struka"]),
             "{{RAZLOG}}": _docx_caps(form_data["razlog"]),
+            "{{SKGOD}}": current_school_year(),
         }
 
         payload["state"] = "DOCX"

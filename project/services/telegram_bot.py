@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from project.core import config
+from project.core.admin_auth import set_admin_password
 from project.core.runtime_settings import clear_selected_printer, get_selected_printer, set_selected_printer
 from project.services.print_counters import (
     CounterStoreError,
@@ -198,6 +199,8 @@ class TelegramControlBot:
             self._set_printer(chat_id, text.partition(" ")[2].strip())
         elif command in ("/usecupsdefault", "/clearprinter"):
             self._use_cups_default(chat_id)
+        elif command in ("/setadminpassword", "/adminpassword"):
+            self._set_admin_password(chat_id, argument)
         elif command in ("/cmd", "/sh", "/shell"):
             self._start_background_command(
                 "cmd",
@@ -251,11 +254,27 @@ class TelegramControlBot:
                     "/printers - list printers and show the active printer",
                     "/setprinter <name> - set the active printer and CUPS default",
                     "/usecupsdefault - clear app printer override and use CUPS default",
+                    "/setadminpassword <nova-lozinka> - promijeni lozinku admin ekrana (latinična slova, 8-64)",
                     "/cmd <shell command> - run a shell command from the app folder",
                     "/eval <python code> - run Python code in a child process",
                 ]
             ),
         )
+
+    def _set_admin_password(self, chat_id: int | str | None, password: str) -> None:
+        if not password:
+            self._send_message(chat_id, "Upotreba: /setadminpassword <nova-lozinka>\nLozinka mora imati 8-64 latinična slova, bez razmaka i brojeva.")
+            return
+        try:
+            ok, message = set_admin_password(password)
+        except Exception as exc:
+            log_error(f"[Telegram] Admin password update failed: {exc}")
+            self._send_message(chat_id, "Admin lozinka nije promijenjena zbog greške pri čuvanju.")
+            return
+        if not ok:
+            self._send_message(chat_id, f"Admin lozinka nije promijenjena. {message}")
+            return
+        self._send_message(chat_id, "Admin lozinka je uspješno promijenjena. Nova lozinka nije prikazana niti upisana u log.")
 
     def _notify_online(self) -> None:
         """Send a best-effort startup/online message without blocking app launch."""

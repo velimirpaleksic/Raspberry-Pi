@@ -1,5 +1,7 @@
 import calendar
 import datetime
+import threading
+import time
 import tkinter as tk
 from tkinter import ttk
 import tkinter.font as tkfont
@@ -12,6 +14,8 @@ from project.gui.ui_components import TouchListPicker, add_placeholder
 from project.gui.virtual_keyboard import VirtualKeyboard, log_keyboard_exception, log_keyboard_warning
 from project.utils.docs.docx_replace_placeholders import value_fits_placeholder
 from project.utils.logging_utils import log_error
+from project.utils.network_status import ConnectivityGate, collect_network_diagnostics
+from project.services.app_control import launch_replacement_app
 
 
 class FormScreen(tk.Frame):
@@ -37,7 +41,14 @@ class FormScreen(tk.Frame):
         self._last_text_entry: tk.Entry | None = None
         self._combo_list_font: tkfont.Font | None = None
         self._auto_opstina_value = ""
+        self._network_gate = ConnectivityGate(threshold=2)
+        self._network_after_id = None
+        self._network_check_inflight = False
+        self._network_generation = 0
+        self._restart_taps = 0
+        self._restart_tap_deadline = 0.0
         self._build_ui()
+        self._build_offline_overlay()
         if config.DEBUG_MODE:
             self.fill_debug_data()
 
@@ -212,6 +223,16 @@ class FormScreen(tk.Frame):
         self.next_button.bind("<ButtonRelease-1>", lambda e: self.next_button.config(bg="#000000"), add=False)
         self.next_button.bind("<Leave>", lambda e: self.next_button.config(bg="#000000"), add=False)
 
+        self.admin_button = tk.Label(
+            action_frame, text="ADMIN", font=button_font, fg="white", bg="#183b5b",
+            bd=0, cursor="none", takefocus=0,
+        )
+        self.admin_button.place(
+            relx=0.965, rely=0.5, anchor="e", width=max(145, int(target_w * 0.18)), height=max(38, action_h - 12)
+        )
+        self.admin_button.bind("<ButtonPress-1>", self._open_admin_from_touch, add=False)
+        self.admin_button.bind("<ButtonRelease-1>", lambda e: self.admin_button.config(bg="#183b5b"), add=False)
+
         keyboard_frame = tk.Frame(content, bg="#f5f5f5", height=keyboard_h)
         keyboard_frame.grid(row=4, column=0, sticky="nsew")
         keyboard_frame.grid_propagate(False)
@@ -252,6 +273,145 @@ class FormScreen(tk.Frame):
 
         self._bind_entries_to_keyboard()
         self._bind_field_validation()
+
+    def _build_offline_overlay(self) -> None:
+        self.offline_overlay = tk.Frame(
+            self, bg="#000000", highlightthickness=8, highlightbackground="#d71920", cursor="none"
+        )
+        card = tk.Frame(self.offline_overlay, bg="#000000")
+        card.place(relx=0.5, rely=0.5, anchor="center")
+        tk.Label(
+            card, text="ТЕРМИНАЛ НИЈЕ У ФУНКЦИЈИ", font=("Arial", 34, "bold"),
+            bg="#000000", fg="#ff3434",
+        ).pack(pady=(0, 18))
+        self.offline_reason_var = tk.StringVar(value="NET_UNREACHABLE — Интернет веза није доступна")
+        tk.Label(
+            card, textvariable=self.offline_reason_var, font=("Arial", 18, "bold"),
+            bg="#000000", fg="#f5f5f5", wraplength=900, justify="center",
+        ).pack(pady=(0, 28))
+        controls = tk.Frame(card, bg="#000000")
+        controls.pack()
+        from project.gui.ui_components import TouchButton
+        TouchButton(
+            controls, text="ADMIN", command=self._open_admin, font=("Arial", 20, "bold"),
+            bg="#183b5b", fg="white", activebackground="#24577f", activeforeground="white",
+            padx=35, pady=16,
+        ).pack(side="left", padx=14)
+        self.offline_restart_button = TouchButton(
+            controls, text="ПОНОВО ПОКРЕНИ (0/3)", command=self._offline_restart_tap,
+            font=("Arial", 20, "bold"), bg="#a51d2d", fg="white",
+            activebackground="#bd2b3d", activeforeground="white", padx=30, pady=16,
+        )
+        self.offline_restart_button.pack(side="left", padx=14)
+
+    def _show_offline_overlay(self, diagnostics: dict) -> None:
+        ssid = str(diagnostics.get("ssid") or "").strip()
+        code = str(diagnostics.get("internet_code") or "NET_UNREACHABLE")
+        if not ssid:
+            code = "NET_WIFI_UNAVAILABLE"
+            message = "Wi-Fi мрежа није доступна"
+        else:
+            messages = {
+                "DNS_FAILED": "DNS сервис није доступан",
+                "NET_TIMEOUT": "Интернет веза не одговара",
+                "NET_UNREACHABLE": "Интернет веза није доступна",
+            }
+            message = messages.get(code, "Интернет веза није доступна")
+        self.offline_reason_var.set(f"{code} — {message}")
+        self.offline_overlay.place(relx=0, rely=0, relwidth=1, relheight=1)
+        self.offline_overlay.lift()
+
+    def _hide_offline_overlay(self) -> None:
+        self.offline_overlay.place_forget()
+        self._restart_taps = 0
+        self.offline_restart_button.config(text="ПОНОВО ПОКРЕНИ (0/3)")
+
+    def _schedule_network_check(self, delay_ms: int = 0) -> None:
+        if self._network_after_id is not None:
+            try:
+                self.after_cancel(self._network_after_id)
+            except Exception:
+                pass
+        generation = self._network_generation
+        self._network_after_id = self.after(delay_ms, lambda: self._start_network_check(generation))
+
+    def _start_network_check(self, generation: int) -> None:
+        self._network_after_id = None
+        if generation != self._network_generation or self._network_check_inflight:
+            return
+        self._network_check_inflight = True
+
+        def worker():
+            try:
+                diagnostics = collect_network_diagnostics()
+            except Exception as exc:
+                diagnostics = {"internet": False, "internet_code": "NET_CHECK_FAILED", "internet_message": str(exc)}
+            if self.manager:
+                self.manager.post_ui_action(lambda: self._finish_network_check(generation, diagnostics))
+
+        threading.Thread(target=worker, name="form-network-check", daemon=True).start()
+
+    def _finish_network_check(self, generation: int, diagnostics: dict) -> None:
+        self._network_check_inflight = False
+        if generation != self._network_generation:
+            return
+        state = self._network_gate.observe(bool(diagnostics.get("internet")))
+        if state.blocked:
+            self._show_offline_overlay(diagnostics)
+        elif state.successes >= self._network_gate.threshold:
+            self._hide_offline_overlay()
+        self._schedule_network_check(5000)
+
+    def _offline_restart_tap(self) -> None:
+        now = time.monotonic()
+        if now > self._restart_tap_deadline:
+            self._restart_taps = 0
+        self._restart_tap_deadline = now + 10
+        self._restart_taps += 1
+        self.offline_restart_button.config(text=f"ПОНОВО ПОКРЕНИ ({self._restart_taps}/3)")
+        if self._restart_taps < 3:
+            return
+        self.offline_restart_button.config(text="ПОКРЕТАЊЕ…", state="disabled")
+
+        def worker():
+            result = launch_replacement_app()
+            if self.manager:
+                self.manager.post_ui_action(lambda: self._finish_offline_restart(result))
+        threading.Thread(target=worker, name="offline-app-restart", daemon=True).start()
+
+    def _finish_offline_restart(self, result) -> None:
+        ok, message = result
+        if ok:
+            self.after(800, self.manager.shutdown)
+            return
+        self.offline_reason_var.set(f"RESTART_FAILED — {message}")
+        self._restart_taps = 0
+        self.offline_restart_button.config(text="ПОНОВО ПОКРЕНИ (0/3)", state="normal")
+
+    def _open_admin_from_touch(self, event=None):
+        self._open_admin()
+        return "break"
+
+    def _open_admin(self):
+        if not self.manager:
+            return
+        self.manager.state["form_data"] = self._snapshot_form_data()
+        self.manager.state["admin_return_screen"] = screen_ids.FORM
+        self.manager.show_frame(screen_ids.ADMIN)
+
+    def _snapshot_form_data(self) -> dict:
+        def value(entry, placeholder=""):
+            raw = str(entry.get() or "").strip()
+            return "" if placeholder and raw == placeholder else raw
+        parts = value(self.ime_entry).split()
+        return {
+            "ime": value(self.ime_entry), "ime_ucenika": parts[0] if parts else "",
+            "prezime": " ".join(parts[1:]), "roditelj": value(self.roditelj_entry),
+            "mjesto": value(self.mjesto_entry, config.MJESTO_PLACEHOLDER),
+            "opstina": value(self.opstina_entry, config.OPSTINA_PLACEHOLDER),
+            "razred": self.razred_var.get(), "struka": self.struka_var.get(), "razlog": self.razlog_var.get(),
+            "dan": self.dan_var.get(), "mjesec": self.mjesec_var.get(), "godina": self.godina_var.get(),
+        }
 
     def _clamp(self, value: int, low: int, high: int) -> int:
         return max(low, min(high, value))
@@ -678,8 +838,18 @@ class FormScreen(tk.Frame):
                 self.fill_debug_data()
         self._clear_validation()
         self._focus_entry(self.ime_entry)
+        self._network_generation += 1
+        self._network_check_inflight = False
+        self._schedule_network_check(0)
 
     def on_hide(self) -> None:
+        self._network_generation += 1
+        if self._network_after_id is not None:
+            try:
+                self.after_cancel(self._network_after_id)
+            except Exception:
+                pass
+            self._network_after_id = None
         picker = getattr(self, "razlog_cb", None)
         if isinstance(picker, TouchListPicker):
             picker.close()
@@ -1185,7 +1355,9 @@ class FormScreen(tk.Frame):
         self._set_entry_text(self.ime_entry, self._normalize_student_name(f"{ime_ucenika} {prezime}".strip()))
         self._set_entry_text(self.roditelj_entry, self._normalize_single_word(str(data.get("roditelj", ""))))
         godina = "".join(ch for ch in str(data.get("godina", "")) if ch.isdigit())
-        if len(godina) >= 4:
+        if godina == "20":
+            godina = "20"
+        elif len(godina) >= 4:
             godina = godina[:4]
         elif len(godina) <= 2:
             godina = "20" + godina[-2:]
