@@ -67,6 +67,12 @@ class AdminAuthTests(unittest.TestCase):
         self.assertEqual(admin_auth.toggled_secret_mask("●"), "")
         self.assertEqual(admin_auth.toggled_secret_mask(""), "●")
 
+    def test_wifi_keyboard_defines_common_password_symbols(self):
+        from project.gui.virtual_keyboard import VirtualKeyboard
+
+        symbols = {token for row in VirtualKeyboard.SYMBOL_ROWS for token in row}
+        self.assertTrue({"!", "@", "#", "$", "%", "&", "*", "?", "-", "_", ".", "/"}.issubset(symbols))
+
 
 class ConnectivityTests(unittest.TestCase):
     def test_gate_requires_two_matching_results(self):

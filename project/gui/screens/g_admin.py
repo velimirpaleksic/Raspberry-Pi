@@ -254,15 +254,17 @@ class AdminScreen(tk.Frame):
         keyboard = VirtualKeyboard(form, bg="#f4f6f8", ui_scale=getattr(self.manager, "ui_scale", 1), target_height=210, alphabet="latin")
         keyboard.pack(fill="both", expand=True)
         for entry in (ssid_entry, pass_entry):
-            keyboard.bind_entry(entry, mode="alpha", uppercase_first=False, allow_numeric=True)
+            keyboard.bind_entry(entry, mode="alpha", uppercase_first=False, allow_numeric=True, allow_symbols=True)
         keyboard.set_active_entry(ssid_entry)
 
         def toggle_keyboard_mode():
             active = keyboard.active_entry if keyboard.active_entry in (ssid_entry, pass_entry) else pass_entry
-            new_mode = "numeric" if keyboard.mode == "alpha" else "alpha"
+            modes = ("alpha", "numeric", "symbols")
+            new_mode = modes[(modes.index(keyboard.mode) + 1) % len(modes)]
             active._vk_mode = new_mode
             keyboard.set_active_entry(active)
-            mode_button.config(text="СЛОВА" if new_mode == "numeric" else "БРОЈЕВИ")
+            next_label = {"alpha": "БРОЈЕВИ", "numeric": "СИМБОЛИ", "symbols": "СЛОВА"}[new_mode]
+            mode_button.config(text=next_label)
 
         mode_button = self._button(controls, "БРОЈЕВИ", toggle_keyboard_mode, width=12)
         mode_button.pack(side="left", padx=4)

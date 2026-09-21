@@ -94,6 +94,11 @@ class VirtualKeyboard(tk.Frame):
         ["7", "8", "9"],
         ["0", "backspace"],
     ]
+    SYMBOL_ROWS = [
+        list("1234567890"),
+        list("!@#$%&*?"),
+        ["-", "_", ".", "+", "=", "/", "backspace"],
+    ]
     NUMERIC_FIELD_KEYS = {"godina", "mjesec", "dan"}
 
     KEY_BG = "#5b5d63"
@@ -160,14 +165,18 @@ class VirtualKeyboard(tk.Frame):
         on_change: Callable[[tk.Entry], None] | None = None,
         placeholder: str | None = None,
         allow_numeric: bool = False,
+        allow_symbols: bool = False,
     ) -> None:
-        requested_mode = mode if mode in {"alpha", "numeric"} else "alpha"
+        requested_mode = mode if mode in {"alpha", "numeric", "symbols"} else "alpha"
         field_key = getattr(entry, "field_key", "")
         entry._vk_allow_numeric = bool(allow_numeric)
+        entry._vk_allow_symbols = bool(allow_symbols)
         if requested_mode == "numeric" and field_key not in self.NUMERIC_FIELD_KEYS and not entry._vk_allow_numeric:
             self._log_warning(
                 f"[VK] Ignoring numeric keyboard mode for non-date field {field_key or entry!s}; using alpha instead"
             )
+            requested_mode = "alpha"
+        if requested_mode == "symbols" and not entry._vk_allow_symbols:
             requested_mode = "alpha"
         entry._vk_mode = requested_mode
         entry._vk_placeholder = placeholder
@@ -200,7 +209,7 @@ class VirtualKeyboard(tk.Frame):
         self._refresh_key_labels()
 
     def set_mode(self, mode: str, *, uppercase: bool | None = None) -> None:
-        mode = mode if mode in {"alpha", "numeric"} else "alpha"
+        mode = mode if mode in {"alpha", "numeric", "symbols"} else "alpha"
         if uppercase is not None:
             self.force_uppercase = bool(uppercase)
         rebuild = self.mode != mode or not self.shell.winfo_children()
@@ -209,6 +218,8 @@ class VirtualKeyboard(tk.Frame):
             self._clear_shell()
             if self.mode == "numeric":
                 self._build_numeric_keyboard()
+            elif self.mode == "symbols":
+                self._build_symbol_keyboard()
             else:
                 self._build_alpha_keyboard()
         self._refresh_key_labels()
@@ -251,6 +262,8 @@ class VirtualKeyboard(tk.Frame):
                     entry._vk_mode = "alpha"
                 except Exception:
                     pass
+            if mode == "symbols" and not bool(getattr(entry, "_vk_allow_symbols", False)):
+                mode = "alpha"
             uppercase = False
             if mode == "alpha" and bool(getattr(entry, "_vk_uppercase_first", False)):
                 uppercase = self._should_use_uppercase(entry)
@@ -286,6 +299,9 @@ class VirtualKeyboard(tk.Frame):
 
     def _build_numeric_keyboard(self) -> None:
         self._build_keyboard(self.NUMERIC_ROWS, alpha=False)
+
+    def _build_symbol_keyboard(self) -> None:
+        self._build_keyboard(self.SYMBOL_ROWS, alpha=True)
 
     def _build_keyboard(self, rows: list[list[str]], *, alpha: bool) -> None:
         keyboard = tk.Frame(self.shell, bg=self.DOCK_BG, cursor="none", takefocus=0)
@@ -619,6 +635,9 @@ class VirtualKeyboard(tk.Frame):
             )
             self._sync_mode_for_entry(entry)
             return False, "numeric keyboard blocked for non-date field"
+        if self.mode == "symbols" and not bool(getattr(entry, "_vk_allow_symbols", False)):
+            self._sync_mode_for_entry(entry)
+            return False, "symbol keyboard blocked for this field"
         one_word = bool(getattr(entry, "_vk_one_word", False))
         max_words = getattr(entry, "_vk_max_words", None)
 
