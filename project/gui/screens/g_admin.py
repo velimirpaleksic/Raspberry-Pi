@@ -96,11 +96,30 @@ class AdminScreen(tk.Frame):
         show_btn.pack(side="left", padx=5)
         self._button(controls, "УЛАЗ", self._login, width=12).pack(side="left", padx=5)
         self._button(controls, "ОДУСТАНИ", self._go_back, danger=True, width=12).pack(side="left", padx=5)
+        keyboard_controls = tk.Frame(card, bg="#f4f6f8")
+        keyboard_controls.pack(pady=(7, 0))
         tk.Label(card, textvariable=self.status_var, font=("Arial", 14, "bold"), bg="#f4f6f8", fg="#a51d2d").pack(pady=6)
         keyboard = VirtualKeyboard(card, bg="#f4f6f8", ui_scale=getattr(self.manager, "ui_scale", 1), target_height=255, alphabet="latin")
         keyboard.pack(fill="both", expand=True)
-        keyboard.bind_entry(entry, mode="alpha", uppercase_first=False, one_word=True)
+        keyboard.bind_entry(entry, mode="alpha", uppercase_first=False, one_word=True, allow_numeric=True)
         keyboard.set_active_entry(entry)
+
+        def toggle_case():
+            uppercase = not bool(getattr(entry, "_vk_manual_uppercase", False))
+            keyboard.set_entry_uppercase(entry, uppercase)
+            case_button.config(text="МАЛА СЛОВА" if uppercase else "ВЕЛИКА СЛОВА")
+            mode_button.config(text="БРОЈЕВИ")
+
+        def toggle_mode():
+            new_mode = "numeric" if keyboard.mode == "alpha" else "alpha"
+            entry._vk_mode = new_mode
+            keyboard.set_active_entry(entry)
+            mode_button.config(text="СЛОВА" if new_mode == "numeric" else "БРОЈЕВИ")
+
+        case_button = self._button(keyboard_controls, "ВЕЛИКА СЛОВА", toggle_case, width=16)
+        case_button.pack(side="left", padx=5)
+        mode_button = self._button(keyboard_controls, "БРОЈЕВИ", toggle_mode, width=14)
+        mode_button.pack(side="left", padx=5)
         entry.focus_set()
 
     def _login(self):
@@ -246,7 +265,7 @@ class AdminScreen(tk.Frame):
         ssid_var, wifi_password = tk.StringVar(), tk.StringVar()
         networks = tk.Frame(form, bg="#f4f6f8")
         networks.pack(fill="x")
-        visible, page, page_count = paginate_values(items, page, 6)
+        visible, page, page_count = paginate_values(items, page, 4)
         for index, item in enumerate(visible):
             security = "отворена" if not item["security"] or item["security"] == "--" else "заштићена"
             label = f"{'● ' if item['active'] else ''}{item['ssid']}  ({item['signal']}%, {security})"
@@ -277,7 +296,9 @@ class AdminScreen(tk.Frame):
         if error and "nmcli" in error.lower():
             connect_button.config(state="disabled", bg="#7b8794", fg="#d0d5dd")
         self._button(controls, "НАЗАД", self._show_dashboard, danger=True, width=12).pack(side="left", padx=4)
-        keyboard = VirtualKeyboard(form, bg="#f4f6f8", ui_scale=getattr(self.manager, "ui_scale", 1), target_height=210, alphabet="latin")
+        keyboard_controls = tk.Frame(form, bg="#f4f6f8")
+        keyboard_controls.pack(pady=(0, 5))
+        keyboard = VirtualKeyboard(form, bg="#f4f6f8", ui_scale=getattr(self.manager, "ui_scale", 1), target_height=185, alphabet="latin")
         keyboard.pack(fill="both", expand=True)
         for entry in (ssid_entry, pass_entry):
             keyboard.bind_entry(entry, mode="alpha", uppercase_first=False, allow_numeric=True, allow_symbols=True)
@@ -292,7 +313,16 @@ class AdminScreen(tk.Frame):
             next_label = {"alpha": "БРОЈЕВИ", "numeric": "СИМБОЛИ", "symbols": "СЛОВА"}[new_mode]
             mode_button.config(text=next_label)
 
-        mode_button = self._button(controls, "БРОЈЕВИ", toggle_keyboard_mode, width=12)
+        def toggle_keyboard_case():
+            active = keyboard.active_entry if keyboard.active_entry in (ssid_entry, pass_entry) else pass_entry
+            uppercase = not bool(getattr(active, "_vk_manual_uppercase", False))
+            keyboard.set_entry_uppercase(active, uppercase)
+            case_button.config(text="МАЛА СЛОВА" if uppercase else "ВЕЛИКА СЛОВА")
+            mode_button.config(text="БРОЈЕВИ")
+
+        case_button = self._button(keyboard_controls, "ВЕЛИКА СЛОВА", toggle_keyboard_case, width=16)
+        case_button.pack(side="left", padx=4)
+        mode_button = self._button(keyboard_controls, "БРОЈЕВИ", toggle_keyboard_mode, width=12)
         mode_button.pack(side="left", padx=4)
 
     def _connect_wifi(self, ssid, password):

@@ -58,8 +58,8 @@ def validate_admin_password(password: str) -> tuple[bool, str]:
         return False, "Лозинка може имати највише 64 знака."
     if any(ch.isspace() for ch in value):
         return False, "Лозинка не смије садржати размак."
-    if not value.isascii() or not all(ch.isalpha() for ch in value):
-        return False, "Лозинка може садржати само латинична слова."
+    if not value.isascii() or not all(ch.isalnum() for ch in value):
+        return False, "Лозинка може садржати само латинична слова и бројеве."
     return True, ""
 
 

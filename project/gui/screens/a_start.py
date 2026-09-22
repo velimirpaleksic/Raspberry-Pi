@@ -6,6 +6,21 @@ from project.gui.ui_components import TouchButton
 from project.utils.logging_utils import log_error
 
 
+def start_availability_state() -> tuple[bool, str, str]:
+    window = config.working_hours_window_text()
+    restriction_enabled = config.working_hours_enabled()
+    blocked = restriction_enabled and not config.is_within_working_hours()
+    disclaimer = f"Радно вријеме терминала: {window}."
+    if not restriction_enabled:
+        disclaimer += "\nАдминистратор је привремено омогућио рад ван тог периода."
+    message = (
+        f"ТЕРМИНАЛ ТРЕНУТНО НЕ РАДИ\nДоступан је од {window}, у радно вријеме секретаријата."
+        if blocked
+        else ""
+    )
+    return blocked, disclaimer, message
+
+
 class StartScreen(tk.Frame):
     def __init__(self, parent, manager=None):
         try:
@@ -13,6 +28,7 @@ class StartScreen(tk.Frame):
             self.manager = manager
             self.message_var = tk.StringVar(value="")
             self.disclaimer_var = tk.StringVar(value="")
+            self._refresh_after_id = None
 
             container = tk.Frame(self, bg="#000000", cursor="none")
             container.pack(expand=True, fill="both")
@@ -86,26 +102,33 @@ class StartScreen(tk.Frame):
             self.manager.set_idle_suspended(True)
         self._refresh_working_hours_message()
 
+    def on_hide(self):
+        if self._refresh_after_id is not None:
+            try:
+                self.after_cancel(self._refresh_after_id)
+            except Exception:
+                pass
+            self._refresh_after_id = None
+
     def _refresh_working_hours_message(self) -> None:
         try:
-            if config.working_hours_enabled():
-                self.disclaimer_var.set(
-                    f"Напомена: Терминал ради у периоду од {config.working_hours_window_text()},\n"
-                    "у радно вријеме секретаријата."
-                )
-            else:
-                self.disclaimer_var.set("Ограничење радног времена је искључено.")
-            if config.is_within_working_hours():
-                self.message_var.set("")
-            else:
-                self.message_var.set(config.working_hours_unavailable_message())
+            blocked, disclaimer, message = start_availability_state()
+            self.disclaimer_var.set(disclaimer)
+            self.message_var.set(message)
+            self.config(highlightthickness=10 if blocked else 0, highlightbackground="#d71920")
+            if self._refresh_after_id is not None:
+                try:
+                    self.after_cancel(self._refresh_after_id)
+                except Exception:
+                    pass
+            self._refresh_after_id = self.after(30_000, self._refresh_working_hours_message)
         except Exception as e:
             log_error(f"Failed to refresh working-hours message: {e}")
 
     def goto_form(self):
         try:
             if not config.is_within_working_hours():
-                self.message_var.set(config.working_hours_unavailable_message())
+                self._refresh_working_hours_message()
                 return
             if self.manager:
                 self.manager.clear_state()

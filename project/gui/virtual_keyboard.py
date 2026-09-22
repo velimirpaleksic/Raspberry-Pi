@@ -181,6 +181,7 @@ class VirtualKeyboard(tk.Frame):
         entry._vk_mode = requested_mode
         entry._vk_placeholder = placeholder
         entry._vk_uppercase_first = bool(uppercase_first)
+        entry._vk_manual_uppercase = None
         entry._vk_one_word = bool(one_word)
         entry._vk_max_words = int(max_words) if max_words else None
         if on_change is not None:
@@ -207,6 +208,13 @@ class VirtualKeyboard(tk.Frame):
         self.active_entry = None
         self._last_active_entry = None
         self._refresh_key_labels()
+
+    def set_entry_uppercase(self, entry: tk.Entry, uppercase: bool) -> None:
+        if not self._entry_is_usable(entry):
+            return
+        entry._vk_manual_uppercase = bool(uppercase)
+        entry._vk_mode = "alpha"
+        self.set_active_entry(entry)
 
     def set_mode(self, mode: str, *, uppercase: bool | None = None) -> None:
         mode = mode if mode in {"alpha", "numeric", "symbols"} else "alpha"
@@ -265,7 +273,10 @@ class VirtualKeyboard(tk.Frame):
             if mode == "symbols" and not bool(getattr(entry, "_vk_allow_symbols", False)):
                 mode = "alpha"
             uppercase = False
-            if mode == "alpha" and bool(getattr(entry, "_vk_uppercase_first", False)):
+            manual_uppercase = getattr(entry, "_vk_manual_uppercase", None)
+            if mode == "alpha" and manual_uppercase is not None:
+                uppercase = bool(manual_uppercase)
+            elif mode == "alpha" and bool(getattr(entry, "_vk_uppercase_first", False)):
                 uppercase = self._should_use_uppercase(entry)
             self.set_mode(mode, uppercase=uppercase)
         except Exception:

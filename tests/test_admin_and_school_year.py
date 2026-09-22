@@ -41,10 +41,11 @@ class AdminAuthTests(unittest.TestCase):
                 self.assertNotIn("novasigurnalozinka", settings.read_text(encoding="utf-8"))
                 self.assertTrue(admin_auth.verify_admin_password("novasigurnalozinka"))
 
-    def test_password_rejects_digits_and_spaces(self):
-        self.assertFalse(admin_auth.validate_admin_password("admin12345")[0])
+    def test_password_accepts_digits_and_rejects_spaces_or_unsupported_scripts(self):
+        self.assertTrue(admin_auth.validate_admin_password("Admin12345")[0])
         self.assertFalse(admin_auth.validate_admin_password("admin lozinka")[0])
         self.assertFalse(admin_auth.validate_admin_password("администратор")[0])
+        self.assertFalse(admin_auth.validate_admin_password("admin!lozinka")[0])
 
     def test_hash_comparison_uses_compare_digest(self):
         encoded = admin_auth.hash_admin_password("sigurnalozinka", salt=b"fixed-test-salt")
@@ -156,6 +157,29 @@ class ConnectivityTests(unittest.TestCase):
 
 
 class AdminFlowTests(unittest.TestCase):
+    def test_start_screen_always_shows_hours_and_blocks_only_when_enabled(self):
+        from project.gui.screens import a_start
+
+        with (
+            patch.object(config, "working_hours_window_text", return_value="08:00 до 15:00"),
+            patch.object(config, "working_hours_enabled", return_value=True),
+            patch.object(config, "is_within_working_hours", return_value=False),
+        ):
+            blocked, disclaimer, message = a_start.start_availability_state()
+        self.assertTrue(blocked)
+        self.assertIn("08:00 до 15:00", disclaimer)
+        self.assertIn("НЕ РАДИ", message)
+
+        with (
+            patch.object(config, "working_hours_window_text", return_value="08:00 до 15:00"),
+            patch.object(config, "working_hours_enabled", return_value=False),
+            patch.object(config, "is_within_working_hours", return_value=True),
+        ):
+            blocked, disclaimer, message = a_start.start_availability_state()
+        self.assertFalse(blocked)
+        self.assertIn("08:00 до 15:00", disclaimer)
+        self.assertIn("привремено", disclaimer)
+        self.assertEqual(message, "")
     def test_start_and_form_both_expose_admin_entry(self):
         root = Path(__file__).resolve().parents[1]
         self.assertIn("goto_admin", (root / "project/gui/screens/a_start.py").read_text(encoding="utf-8"))
