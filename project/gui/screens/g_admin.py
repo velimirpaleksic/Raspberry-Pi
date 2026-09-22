@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 import tkinter as tk
 
+from project.core import config
 from project.core.admin_auth import AdminLoginGuard, toggled_secret_mask
 from project.core.school_year import current_school_year
 from project.gui import screen_ids
@@ -12,7 +13,13 @@ from project.services.app_control import launch_replacement_app
 from project.services.self_test import format_self_test_report, run_self_test
 from project.services.telegram_notify import notify_telegram_async
 from project.services.storage_cleanup import collect_storage_report, format_bytes
-from project.core.runtime_settings import clear_selected_printer, get_selected_printer, set_selected_printer
+from project.core.runtime_settings import (
+    clear_selected_printer,
+    get_selected_printer,
+    get_working_hours_enabled,
+    set_selected_printer,
+    set_working_hours_enabled,
+)
 from project.utils.network_status import collect_network_diagnostics, connect_wifi, scan_wifi_networks
 from project.utils.printing.printer_status import collect_printer_diagnostics, list_configured_printers, set_cups_default_printer
 
@@ -123,6 +130,11 @@ class AdminScreen(tk.Frame):
         grid.pack(expand=True)
         actions = [
             ("СТАТУС СИСТЕМА", self._load_status, False),
+            (
+                f"РАДНО ВРИЈЕМЕ: {'УКЉУЧЕНО' if get_working_hours_enabled() else 'ИСКЉУЧЕНО'}",
+                self._toggle_working_hours,
+                False,
+            ),
             ("WI-FI МРЕЖА", self._show_wifi, False),
             ("SELF-TEST БЕЗ ШТАМПЕ", self._run_self_test, False),
             ("ИЗБОР ШТАМПАЧА", self._show_printers, False),
@@ -187,6 +199,11 @@ class AdminScreen(tk.Frame):
             ("ШТАМПАЧ", str(printer.get("resolved") or "није изабран"), bool(printer.get("ready"))),
             ("СЛОБОДАН ПРОСТОР", free_space, app_disk is not None and not app_disk.error),
             ("ШКОЛСКА ГОДИНА", year, True),
+            (
+                "РАДНО ВРИЈЕМЕ",
+                f"УКЉУЧЕНО ({config.working_hours_window_text()})" if get_working_hours_enabled() else "ИСКЉУЧЕНО — терминал ради цијели дан",
+                True,
+            ),
         ]
         for index, (label, value, ok) in enumerate(rows):
             card = tk.Frame(cards, bg="white", padx=18, pady=14, highlightthickness=2, highlightbackground="#22a06b" if ok else "#d14343")
@@ -205,6 +222,15 @@ class AdminScreen(tk.Frame):
             self.status_var.set("Self-test је успјешан; папир није штампан." if report.ok else "Self-test је пронашао грешку; извјештај је послан на Telegram.")
             notify_admin_self_test_failure(report)
         self._worker("Self-test", run_self_test, done)
+
+    def _toggle_working_hours(self):
+        enabled = not get_working_hours_enabled()
+        set_working_hours_enabled(enabled)
+        self._show_dashboard()
+        self.status_var.set(
+            f"Ограничење {config.working_hours_window_text()} је {'укључено' if enabled else 'искључено'}. "
+            + ("Терминал поштује радно вријеме." if enabled else "Терминал је доступан цијели дан.")
+        )
 
     def _show_wifi(self):
         self._worker("Претрага Wi-Fi мрежа", scan_wifi_networks, self._render_wifi)

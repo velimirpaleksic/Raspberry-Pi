@@ -12,6 +12,7 @@ class StartScreen(tk.Frame):
             super().__init__(parent, bg="#000000")
             self.manager = manager
             self.message_var = tk.StringVar(value="")
+            self.disclaimer_var = tk.StringVar(value="")
 
             container = tk.Frame(self, bg="#000000", cursor="none")
             container.pack(expand=True, fill="both")
@@ -37,7 +38,7 @@ class StartScreen(tk.Frame):
 
             disclaimer = tk.Label(
                 content,
-                text=f"Напомена: Терминал ради у периоду од {config.working_hours_window_text()},\nу радно вријеме секретаријата.",
+                textvariable=self.disclaimer_var,
                 font=("Arial", 24, "bold"),
                 fg="#f2f2f2",
                 bg="#000000",
@@ -87,6 +88,13 @@ class StartScreen(tk.Frame):
 
     def _refresh_working_hours_message(self) -> None:
         try:
+            if config.working_hours_enabled():
+                self.disclaimer_var.set(
+                    f"Напомена: Терминал ради у периоду од {config.working_hours_window_text()},\n"
+                    "у радно вријеме секретаријата."
+                )
+            else:
+                self.disclaimer_var.set("Ограничење радног времена је искључено.")
             if config.is_within_working_hours():
                 self.message_var.set("")
             else:

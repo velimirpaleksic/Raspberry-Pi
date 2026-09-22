@@ -46,6 +46,19 @@ def set_setting(name: str, value: Any) -> None:
         _write_settings_unlocked(settings)
 
 
+def get_working_hours_enabled() -> bool:
+    value = get_setting("working_hours_enabled", None)
+    if isinstance(value, bool):
+        return value
+    return bool(config.WORKING_HOURS_ENABLED)
+
+
+def set_working_hours_enabled(enabled: bool) -> None:
+    value = bool(enabled)
+    set_setting("working_hours_enabled", value)
+    config.WORKING_HOURS_ENABLED = value
+
+
 def get_selected_printer() -> str:
     with _LOCK:
         settings = _read_settings_unlocked()

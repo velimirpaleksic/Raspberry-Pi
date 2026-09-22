@@ -6,6 +6,8 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from project.core import admin_auth
+from project.core import config
+from project.core import runtime_settings
 from project.core.school_year import school_year_for_date
 from project.gui.screens.c_form import FormScreen
 from project.gui.screens.g_admin import AdminScreen, notify_admin_self_test_failure
@@ -224,6 +226,17 @@ class AdminFlowTests(unittest.TestCase):
             notify.assert_not_called()
             self.assertTrue(notify_admin_self_test_failure(failed))
             notify.assert_called_once()
+
+    def test_working_hours_runtime_toggle_persists_and_applies_immediately(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            settings = Path(temp_dir) / "settings.json"
+            with patch.object(config, "SETTINGS_FILE", settings), patch.object(config, "WORKING_HOURS_ENABLED", True):
+                runtime_settings.set_working_hours_enabled(False)
+                self.assertFalse(runtime_settings.get_working_hours_enabled())
+                self.assertTrue(config.is_within_working_hours(dt.time(23, 30)))
+                self.assertFalse(__import__("json").loads(settings.read_text(encoding="utf-8"))["working_hours_enabled"])
+                runtime_settings.set_working_hours_enabled(True)
+                self.assertFalse(config.is_within_working_hours(dt.time(23, 30)))
 
 
 if __name__ == "__main__":

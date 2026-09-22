@@ -263,7 +263,7 @@ def working_hours_window_text() -> str:
 
 
 def is_within_working_hours(now: datetime.datetime | datetime.time | None = None) -> bool:
-    if not WORKING_HOURS_ENABLED:
+    if not working_hours_enabled():
         return True
 
     start, end = working_hours_bounds()
@@ -286,9 +286,23 @@ def is_within_working_hours(now: datetime.datetime | datetime.time | None = None
 
 
 def working_hours_status_text(now: datetime.datetime | datetime.time | None = None) -> str:
-    if not WORKING_HOURS_ENABLED:
+    if not working_hours_enabled():
         return "disabled"
     return f"{'open' if is_within_working_hours(now) else 'closed'} ({working_hours_window_text()})"
+
+
+def working_hours_enabled() -> bool:
+    """Return the runtime override when set, otherwise the env default."""
+
+    try:
+        from project.core.runtime_settings import get_setting
+
+        value = get_setting("working_hours_enabled", None)
+        if isinstance(value, bool):
+            return value
+    except Exception:
+        pass
+    return bool(WORKING_HOURS_ENABLED)
 
 
 def working_hours_unavailable_message() -> str:
