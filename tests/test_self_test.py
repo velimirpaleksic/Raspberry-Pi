@@ -122,6 +122,46 @@ class TelegramSelfTestCommandTests(unittest.TestCase):
         self.assertIn("uspješno", response)
         self.assertNotIn("novasigurnalozinka", response)
 
+    def test_working_hours_off_command_persists_and_reports_all_day(self):
+        bot = TelegramControlBot()
+        user_id = int(bot.allowed_user_id)
+        update = {
+            "message": {
+                "from": {"id": user_id},
+                "chat": {"id": user_id},
+                "text": "/workinghours off",
+            }
+        }
+        with (
+            patch("project.services.telegram_bot.set_working_hours_enabled") as setter,
+            patch.object(bot, "_refresh_start_screen_working_hours") as refresh,
+            patch.object(bot, "_send_message") as send,
+        ):
+            bot._handle_update(update)
+        setter.assert_called_once_with(False)
+        refresh.assert_called_once()
+        self.assertIn("ISKLJUČENO", send.call_args.args[1])
+        self.assertIn("cijeli dan", send.call_args.args[1])
+
+    def test_working_hours_status_does_not_change_setting(self):
+        bot = object.__new__(TelegramControlBot)
+        bot._send_message = Mock()
+        with (
+            patch("project.services.telegram_bot.get_working_hours_enabled", return_value=True),
+            patch("project.services.telegram_bot.set_working_hours_enabled") as setter,
+        ):
+            bot._set_working_hours(123, "status")
+        setter.assert_not_called()
+        self.assertIn("UKLJUČENO", bot._send_message.call_args.args[1])
+
+    def test_working_hours_invalid_argument_returns_usage(self):
+        bot = object.__new__(TelegramControlBot)
+        bot._send_message = Mock()
+        with patch("project.services.telegram_bot.set_working_hours_enabled") as setter:
+            bot._set_working_hours(123, "mozda")
+        setter.assert_not_called()
+        self.assertIn("Upotreba", bot._send_message.call_args.args[1])
+
 
 if __name__ == "__main__":
     unittest.main()

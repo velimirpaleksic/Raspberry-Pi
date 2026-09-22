@@ -18,7 +18,13 @@ from typing import Any
 
 from project.core import config
 from project.core.admin_auth import set_admin_password
-from project.core.runtime_settings import clear_selected_printer, get_selected_printer, set_selected_printer
+from project.core.runtime_settings import (
+    clear_selected_printer,
+    get_selected_printer,
+    get_working_hours_enabled,
+    set_selected_printer,
+    set_working_hours_enabled,
+)
 from project.services.print_counters import (
     CounterStoreError,
     format_print_counters,
@@ -201,6 +207,8 @@ class TelegramControlBot:
             self._use_cups_default(chat_id)
         elif command in ("/setadminpassword", "/adminpassword"):
             self._set_admin_password(chat_id, argument)
+        elif command in ("/workinghours", "/radnovrijeme"):
+            self._set_working_hours(chat_id, argument)
         elif command in ("/cmd", "/sh", "/shell"):
             self._start_background_command(
                 "cmd",
@@ -255,6 +263,7 @@ class TelegramControlBot:
                     "/setprinter <name> - set the active printer and CUPS default",
                     "/usecupsdefault - clear app printer override and use CUPS default",
                     "/setadminpassword <nova-lozinka> - promijeni lozinku admin ekrana (latinična slova, 8-64)",
+                    "/workinghours [on|off|status] - uključi ili isključi ograničenje 08:00-15:00",
                     "/cmd <shell command> - run a shell command from the app folder",
                     "/eval <python code> - run Python code in a child process",
                 ]
@@ -275,6 +284,53 @@ class TelegramControlBot:
             self._send_message(chat_id, f"Admin lozinka nije promijenjena. {message}")
             return
         self._send_message(chat_id, "Admin lozinka je uspješno promijenjena. Nova lozinka nije prikazana niti upisana u log.")
+
+    def _set_working_hours(self, chat_id: int | str | None, argument: str) -> None:
+        mode = str(argument or "").strip().lower()
+        if mode in {"", "status", "stanje"}:
+            enabled = get_working_hours_enabled()
+            self._send_message(
+                chat_id,
+                "Ograničenje radnog vremena je "
+                + ("UKLJUČENO (08:00-15:00)." if enabled else "ISKLJUČENO. Terminal je dostupan cijeli dan."),
+            )
+            return
+        if mode in {"on", "ukljuci", "uključi", "1"}:
+            enabled = True
+        elif mode in {"off", "iskljuci", "isključi", "0"}:
+            enabled = False
+        else:
+            self._send_message(chat_id, "Upotreba: /workinghours on, /workinghours off ili /workinghours status")
+            return
+        try:
+            set_working_hours_enabled(enabled)
+        except Exception as exc:
+            log_error(f"[Telegram] Working-hours update failed: {exc}")
+            self._send_message(chat_id, "Postavka radnog vremena nije promijenjena zbog greške pri čuvanju.")
+            return
+        self._refresh_start_screen_working_hours()
+        self._send_message(
+            chat_id,
+            "Ograničenje radnog vremena je "
+            + ("UKLJUČENO. Terminal radi od 08:00 do 15:00." if enabled else "ISKLJUČENO. Terminal je dostupan cijeli dan."),
+        )
+
+    def _refresh_start_screen_working_hours(self) -> None:
+        manager = self.manager
+        if manager is None or not hasattr(manager, "post_ui_action"):
+            return
+
+        def refresh() -> None:
+            try:
+                from project.gui import screen_ids
+
+                frame = manager.frames.get(screen_ids.START)
+                if frame is not None and hasattr(frame, "_refresh_working_hours_message"):
+                    frame._refresh_working_hours_message()
+            except Exception as exc:
+                log_error(f"[Telegram] Could not refresh working-hours UI: {exc}")
+
+        manager.post_ui_action(refresh)
 
     def _notify_online(self) -> None:
         """Send a best-effort startup/online message without blocking app launch."""
