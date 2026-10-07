@@ -12,6 +12,7 @@ from project.core.school_year import school_year_for_date
 from project.gui.screens.c_form import FormScreen
 from project.gui.screens.g_admin import AdminScreen, notify_admin_self_test_failure
 from project.services.self_test import SelfTestCheck, SelfTestReport
+from project.services import app_control
 from project.utils import network_status
 from project.utils.network_status import ConnectivityGate, _split_nmcli_escaped
 
@@ -41,8 +42,9 @@ class AdminAuthTests(unittest.TestCase):
                 self.assertNotIn("novasigurnalozinka", settings.read_text(encoding="utf-8"))
                 self.assertTrue(admin_auth.verify_admin_password("novasigurnalozinka"))
 
-    def test_password_accepts_digits_and_rejects_spaces_or_unsupported_scripts(self):
-        self.assertTrue(admin_auth.validate_admin_password("Admin12345")[0])
+    def test_password_accepts_lowercase_and_digits_only(self):
+        self.assertTrue(admin_auth.validate_admin_password("admin12345")[0])
+        self.assertFalse(admin_auth.validate_admin_password("Admin12345")[0])
         self.assertFalse(admin_auth.validate_admin_password("admin lozinka")[0])
         self.assertFalse(admin_auth.validate_admin_password("администратор")[0])
         self.assertFalse(admin_auth.validate_admin_password("admin!lozinka")[0])
@@ -108,8 +110,9 @@ class ConnectivityTests(unittest.TestCase):
         completed = SimpleNamespace(returncode=0, stdout="connected vrloTajnaLozinka")
         with (
             patch.object(network_status.shutil, "which", return_value="/usr/bin/nmcli"),
-            patch.object(network_status, "active_wifi_details", return_value={"connection_name": "Stara"}),
+            patch.object(network_status, "active_wifi_details", side_effect=[{"connection_name": "Stara"}, {"connection_name": "Nova"}]),
             patch.object(network_status.subprocess, "run", return_value=completed) as run,
+            patch.object(network_status, "ensure_wifi_autoconnect", return_value=(True, "Wi-Fi profil je sačuvan.")),
             patch.object(network_status, "check_internet", return_value=(True, "OK", "ok")),
         ):
             ok, _message = network_status.connect_wifi("Nova", "vrloTajnaLozinka")
@@ -119,6 +122,20 @@ class ConnectivityTests(unittest.TestCase):
         self.assertFalse(run.call_args.kwargs.get("shell", False))
         self.assertNotIn("vrloTajnaLozinka", _message)
         self.assertIn("[REDACTED]", _message)
+
+    def test_wifi_profile_is_persisted_and_autoconnect_verified(self):
+        responses = [(True, "modified"), (True, "yes")]
+        with patch.object(network_status, "_run", side_effect=responses) as runner:
+            ok, message = network_status.ensure_wifi_autoconnect("Nova mreza")
+        self.assertTrue(ok, message)
+        self.assertEqual(
+            runner.call_args_list[0].args[0],
+            ["nmcli", "connection", "modify", "Nova mreza", "connection.autoconnect", "yes"],
+        )
+        self.assertEqual(
+            runner.call_args_list[1].args[0],
+            ["nmcli", "-g", "connection.autoconnect", "connection", "show", "Nova mreza"],
+        )
 
     def test_active_wifi_status_reads_connection_ssid_and_signal(self):
         responses = [
@@ -154,6 +171,29 @@ class ConnectivityTests(unittest.TestCase):
             ok, message = network_status.connect_wifi("Nova", "tajna")
         self.assertFalse(ok)
         self.assertIn("предуго", message)
+
+
+class AppControlTests(unittest.TestCase):
+    def test_system_reboot_uses_argument_list_without_shell(self):
+        completed = SimpleNamespace(returncode=0, stdout="")
+        with (
+            patch.object(app_control.config, "TELEGRAM_REBOOT_COMMAND", "sudo -n shutdown -r now"),
+            patch.object(app_control.subprocess, "run", return_value=completed) as run,
+        ):
+            ok, message = app_control.request_system_reboot()
+        self.assertTrue(ok, message)
+        self.assertEqual(run.call_args.args[0], ["sudo", "-n", "shutdown", "-r", "now"])
+        self.assertFalse(run.call_args.kwargs["shell"])
+
+    def test_system_reboot_failure_is_controlled(self):
+        completed = SimpleNamespace(returncode=1, stdout="permission denied")
+        with (
+            patch.object(app_control.config, "TELEGRAM_REBOOT_COMMAND", "sudo -n shutdown -r now"),
+            patch.object(app_control.subprocess, "run", return_value=completed),
+        ):
+            ok, message = app_control.request_system_reboot()
+        self.assertFalse(ok)
+        self.assertIn("код 1", message)
 
 
 class AdminFlowTests(unittest.TestCase):

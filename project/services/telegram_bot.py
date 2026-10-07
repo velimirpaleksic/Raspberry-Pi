@@ -262,7 +262,7 @@ class TelegramControlBot:
                     "/printers - list printers and show the active printer",
                     "/setprinter <name> - set the active printer and CUPS default",
                     "/usecupsdefault - clear app printer override and use CUPS default",
-                    "/setadminpassword <nova-lozinka> - promijeni lozinku admin ekrana (latinična slova i brojevi, 8-64)",
+                    "/setadminpassword <nova-lozinka> - promijeni lozinku admin ekrana (mala latinična slova i brojevi, 8-64)",
                     "/workinghours [on|off|status] - uključi ili isključi ograničenje 08:00-15:00",
                     "/cmd <shell command> - run a shell command from the app folder",
                     "/eval <python code> - run Python code in a child process",
@@ -272,7 +272,7 @@ class TelegramControlBot:
 
     def _set_admin_password(self, chat_id: int | str | None, password: str) -> None:
         if not password:
-            self._send_message(chat_id, "Upotreba: /setadminpassword <nova-lozinka>\nLozinka mora imati 8-64 latinična slova ili broja, bez razmaka.")
+            self._send_message(chat_id, "Upotreba: /setadminpassword <nova-lozinka>\nLozinka mora imati 8-64 mala latinična slova ili brojeva, bez razmaka.")
             return
         try:
             ok, message = set_admin_password(password)

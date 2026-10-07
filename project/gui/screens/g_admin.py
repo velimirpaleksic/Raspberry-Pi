@@ -102,13 +102,7 @@ class AdminScreen(tk.Frame):
         keyboard = VirtualKeyboard(card, bg="#f4f6f8", ui_scale=getattr(self.manager, "ui_scale", 1), target_height=255, alphabet="latin")
         keyboard.pack(fill="both", expand=True)
         keyboard.bind_entry(entry, mode="alpha", uppercase_first=False, one_word=True, allow_numeric=True)
-        keyboard.set_active_entry(entry)
-
-        def toggle_case():
-            uppercase = not bool(getattr(entry, "_vk_manual_uppercase", False))
-            keyboard.set_entry_uppercase(entry, uppercase)
-            case_button.config(text="МАЛА СЛОВА" if uppercase else "ВЕЛИКА СЛОВА")
-            mode_button.config(text="БРОЈЕВИ")
+        keyboard.set_entry_uppercase(entry, False)
 
         def toggle_mode():
             new_mode = "numeric" if keyboard.mode == "alpha" else "alpha"
@@ -116,8 +110,6 @@ class AdminScreen(tk.Frame):
             keyboard.set_active_entry(entry)
             mode_button.config(text="СЛОВА" if new_mode == "numeric" else "БРОЈЕВИ")
 
-        case_button = self._button(keyboard_controls, "ВЕЛИКА СЛОВА", toggle_case, width=16)
-        case_button.pack(side="left", padx=5)
         mode_button = self._button(keyboard_controls, "БРОЈЕВИ", toggle_mode, width=14)
         mode_button.pack(side="left", padx=5)
         entry.focus_set()
@@ -302,6 +294,7 @@ class AdminScreen(tk.Frame):
         keyboard.pack(fill="both", expand=True)
         for entry in (ssid_entry, pass_entry):
             keyboard.bind_entry(entry, mode="alpha", uppercase_first=False, allow_numeric=True, allow_symbols=True)
+            entry._vk_manual_uppercase = False
         keyboard.set_active_entry(ssid_entry)
 
         def toggle_keyboard_mode():

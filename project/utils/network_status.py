@@ -184,6 +184,28 @@ def scan_wifi_networks() -> tuple[list[dict[str, Any]], str]:
     return sorted(best.values(), key=lambda item: (not item["active"], -int(item["signal"]), str(item["ssid"]).lower())), ""
 
 
+def ensure_wifi_autoconnect(connection_name: str) -> tuple[bool, str]:
+    """Persist a NetworkManager profile and verify automatic reconnect is enabled."""
+
+    clean_name = str(connection_name or "").strip()
+    if not clean_name:
+        return False, "Назив сачуване Wi-Fi везе није доступан."
+    modified, output = _run(
+        ["nmcli", "connection", "modify", clean_name, "connection.autoconnect", "yes"],
+        timeout=20,
+    )
+    if not modified:
+        return False, output or "Аутоматско повезивање није могло бити укључено."
+    verified, value = _run(
+        ["nmcli", "-g", "connection.autoconnect", "connection", "show", clean_name],
+        timeout=20,
+    )
+    enabled = str(value or "").strip().lower() in {"yes", "true", "da", "1"}
+    if not verified or not enabled:
+        return False, value or "Аутоматско повезивање није потврђено."
+    return True, "Wi-Fi профил је трајно сачуван и аутоматско повезивање је укључено."
+
+
 def connect_wifi(ssid: str, password: str = "") -> tuple[bool, str]:
     """Connect through NetworkManager without putting the password in argv."""
 
@@ -215,9 +237,19 @@ def connect_wifi(ssid: str, password: str = "") -> tuple[bool, str]:
                 restored, restore_output = _run(["nmcli", "connection", "up", previous_connection], timeout=45)
                 rollback = " Претходна мрежа је враћена." if restored else f" Повратак на претходну мрежу није успио: {restore_output}"
             return False, (output or "Повезивање није успјело.") + rollback
+        active = active_wifi_details()
+        active_connection = str(active.get("connection_name") or clean_ssid).strip()
+        persisted, persistence_message = ensure_wifi_autoconnect(active_connection)
+        if not persisted:
+            rollback = ""
+            if previous_connection:
+                restored, restore_output = _run(["nmcli", "connection", "up", previous_connection], timeout=45)
+                rollback = " Претходна мрежа је враћена." if restored else f" Повратак на претходну мрежу није успио: {restore_output}"
+            return False, f"Wi-Fi је повезан, али профил није трајно сачуван: {persistence_message}.{rollback}"
         online, _code, message = check_internet()
         if online:
-            return True, output
+            details = " ".join(part for part in (output, persistence_message) if part).strip()
+            return True, details
         rollback = ""
         if previous_connection:
             restored, restore_output = _run(["nmcli", "connection", "up", previous_connection], timeout=45)

@@ -15,7 +15,7 @@ from project.gui.virtual_keyboard import VirtualKeyboard, log_keyboard_exception
 from project.utils.docs.docx_replace_placeholders import value_fits_placeholder
 from project.utils.logging_utils import log_error
 from project.utils.network_status import ConnectivityGate, collect_network_diagnostics
-from project.services.app_control import launch_replacement_app
+from project.services.app_control import request_system_reboot
 
 
 class FormScreen(tk.Frame):
@@ -298,7 +298,7 @@ class FormScreen(tk.Frame):
             padx=35, pady=16,
         ).pack(side="left", padx=14)
         self.offline_restart_button = TouchButton(
-            controls, text="ПОНОВО ПОКРЕНИ (0/3)", command=self._offline_restart_tap,
+            controls, text="РЕСТАРТ СИСТЕМА (0/3)", command=self._offline_restart_tap,
             font=("Arial", 20, "bold"), bg="#a51d2d", fg="white",
             activebackground="#bd2b3d", activeforeground="white", padx=30, pady=16,
         )
@@ -324,7 +324,7 @@ class FormScreen(tk.Frame):
     def _hide_offline_overlay(self) -> None:
         self.offline_overlay.place_forget()
         self._restart_taps = 0
-        self.offline_restart_button.config(text="ПОНОВО ПОКРЕНИ (0/3)")
+        self.offline_restart_button.config(text="РЕСТАРТ СИСТЕМА (0/3)")
 
     def _schedule_network_check(self, delay_ms: int = 0) -> None:
         if self._network_after_id is not None:
@@ -368,25 +368,26 @@ class FormScreen(tk.Frame):
             self._restart_taps = 0
         self._restart_tap_deadline = now + 10
         self._restart_taps += 1
-        self.offline_restart_button.config(text=f"ПОНОВО ПОКРЕНИ ({self._restart_taps}/3)")
+        self.offline_restart_button.config(text=f"РЕСТАРТ СИСТЕМА ({self._restart_taps}/3)")
         if self._restart_taps < 3:
             return
         self.offline_restart_button.config(text="ПОКРЕТАЊЕ…", state="disabled")
 
         def worker():
-            result = launch_replacement_app()
+            result = request_system_reboot()
             if self.manager:
                 self.manager.post_ui_action(lambda: self._finish_offline_restart(result))
-        threading.Thread(target=worker, name="offline-app-restart", daemon=True).start()
+        threading.Thread(target=worker, name="offline-system-reboot", daemon=True).start()
 
     def _finish_offline_restart(self, result) -> None:
         ok, message = result
         if ok:
-            self.after(800, self.manager.shutdown)
+            self.offline_reason_var.set("SYSTEM_REBOOT — Систем се поново покреће…")
+            self.offline_restart_button.config(text="ПОНОВНО ПОКРЕТАЊЕ…", state="disabled")
             return
         self.offline_reason_var.set(f"RESTART_FAILED — {message}")
         self._restart_taps = 0
-        self.offline_restart_button.config(text="ПОНОВО ПОКРЕНИ (0/3)", state="normal")
+        self.offline_restart_button.config(text="РЕСТАРТ СИСТЕМА (0/3)", state="normal")
 
     def _open_admin_from_touch(self, event=None):
         self._open_admin()
