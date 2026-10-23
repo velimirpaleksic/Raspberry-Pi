@@ -33,6 +33,7 @@ def main() -> int:
         from project.gui.screens.g_admin import AdminScreen
         from project.services.storage_cleanup import start_periodic_cleanup
         from project.services.telegram_bot import start_telegram_control_bot
+        from project.core.runtime_settings import get_terminal_locked
 
         telegram_bot = None
         cleanup_service = None
@@ -47,6 +48,8 @@ def main() -> int:
             telegram_bot = start_telegram_control_bot(manager=manager)
             cleanup_service = start_periodic_cleanup()
             manager.show_frame(screen_ids.START)
+            if get_terminal_locked():
+                manager.set_input_locked(True, "Терминал је привремено закључан због техничких радова.")
             manager.mainloop()
         finally:
             if cleanup_service is not None:

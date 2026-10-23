@@ -11,6 +11,7 @@ from project.core import runtime_settings
 from project.core.school_year import school_year_for_date
 from project.gui.screens.c_form import FormScreen
 from project.gui.screens.g_admin import AdminScreen, notify_admin_self_test_failure
+from project.gui.virtual_keyboard import space_insertion_allowed
 from project.services.self_test import SelfTestCheck, SelfTestReport
 from project.services import app_control
 from project.utils import network_status
@@ -197,6 +198,42 @@ class AppControlTests(unittest.TestCase):
 
 
 class AdminFlowTests(unittest.TestCase):
+    def test_virtual_space_blocks_leading_and_repeated_spaces(self):
+        self.assertFalse(space_insertion_allowed("", 0))
+        self.assertFalse(space_insertion_allowed("Ana ", 4))
+        self.assertFalse(space_insertion_allowed("Ana Marko", 4))
+        self.assertTrue(space_insertion_allowed("Ana", 3))
+
+    def test_date_input_does_not_advance_focus_automatically(self):
+        year_entry = SimpleNamespace(icursor=Mock())
+        year = SimpleNamespace(
+            godina_var=SimpleNamespace(get=lambda: "2008", set=Mock()),
+            godina_entry=year_entry,
+            active_entry=year_entry,
+            kbd=SimpleNamespace(set_active_entry=Mock()),
+        )
+        FormScreen._on_year_input(year)
+        year.kbd.set_active_entry.assert_called_once_with(year_entry)
+
+        month_entry = SimpleNamespace(icursor=Mock())
+        month = SimpleNamespace(
+            mjesec_var=SimpleNamespace(get=lambda: "12", set=Mock()),
+            mjesec_entry=month_entry,
+            active_entry=month_entry,
+            kbd=SimpleNamespace(set_active_entry=Mock()),
+        )
+        FormScreen._on_month_input(month)
+        month.kbd.set_active_entry.assert_called_once_with(month_entry)
+
+    def test_terminal_lock_setting_persists(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            settings = Path(temp_dir) / "settings.json"
+            with patch.object(config, "SETTINGS_FILE", settings):
+                runtime_settings.set_terminal_locked(True)
+                self.assertTrue(runtime_settings.get_terminal_locked())
+                runtime_settings.set_terminal_locked(False)
+                self.assertFalse(runtime_settings.get_terminal_locked())
+
     def test_start_screen_always_shows_hours_and_blocks_only_when_enabled(self):
         from project.gui.screens import a_start
 

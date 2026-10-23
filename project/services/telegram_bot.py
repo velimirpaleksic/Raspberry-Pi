@@ -21,8 +21,10 @@ from project.core.admin_auth import set_admin_password
 from project.core.runtime_settings import (
     clear_selected_printer,
     get_selected_printer,
+    get_terminal_locked,
     get_working_hours_enabled,
     set_selected_printer,
+    set_terminal_locked,
     set_working_hours_enabled,
 )
 from project.services.print_counters import (
@@ -39,6 +41,7 @@ from project.utils.logging_utils import log_error, log_info
 from project.utils.network_status import collect_network_diagnostics, reconnect_network
 from project.utils.printing.printer_status import (
     collect_printer_diagnostics,
+    detect_available_printer,
     find_configured_printer,
     list_configured_printers,
     set_cups_default_printer,
@@ -156,10 +159,12 @@ class TelegramControlBot:
             self._send_help(chat_id)
         elif command == "/ping":
             self._send_message(chat_id, "pong")
-        elif command in ("/status", "/appstatus"):
+        elif command in ("/status", "/appstatus", "/health"):
             self._send_status(chat_id)
         elif command in ("/selftest", "/testapp"):
             self._start_background_command("selftest", chat_id, self._run_self_test)
+        elif command in ("/diagnose", "/diagnostics"):
+            self._start_background_command("diagnose", chat_id, self._run_self_test)
         elif command in ("/counts", "/counter", "/printcounts"):
             self._send_print_counters(chat_id)
         elif command in ("/countset", "/setcount"):
@@ -184,9 +189,10 @@ class TelegramControlBot:
             self._hide_app(chat_id)
         elif command in ("/restartapp", "/apprestart", "/reopen", "/reopenapp"):
             self._start_background_command("restartapp", chat_id, self._reopen_app)
+        elif command == "/lock":
+            self._set_terminal_lock(chat_id, True)
         elif command == "/unlock":
-            self._set_update_input_locked(False)
-            self._send_message(chat_id, "Input lock cleared.")
+            self._set_terminal_lock(chat_id, False)
         elif command in ("/logs", "/errors"):
             self._send_logs(chat_id)
         elif command == "/restart":
@@ -203,6 +209,8 @@ class TelegramControlBot:
             self._send_printer_status(chat_id)
         elif command in ("/setprinter", "/defaultprinter"):
             self._set_printer(chat_id, text.partition(" ")[2].strip())
+        elif command in ("/autoprinter", "/repairprinter"):
+            self._start_background_command("autoprinter", chat_id, self._auto_select_printer)
         elif command in ("/usecupsdefault", "/clearprinter"):
             self._use_cups_default(chat_id)
         elif command in ("/setadminpassword", "/adminpassword"):
@@ -239,7 +247,9 @@ class TelegramControlBot:
                     "Uvjerenja Terminal controls:",
                     "/help - show this message",
                     "/status - app, Telegram, disk space, network and printer status",
+                    "/health - alias for complete status",
                     "/selftest - generate and verify DOCX/PDF and check the system without printing",
+                    "/diagnose - alias for complete self-test without printing",
                     "/counts - show successful print counts for every reason",
                     "/countset <reason-number> <value> - set a counter value",
                     "/countreset [reason-number] - reset one counter, or all when omitted",
@@ -255,12 +265,14 @@ class TelegramControlBot:
                     "/closeapp - hide the kiosk window but keep Telegram alive",
                     "/restartapp - restart/reopen the kiosk app",
                     "/reopen - alias for /restartapp",
-                    "/unlock - clear update/input lock if the kiosk gets stuck",
+                    "/lock - lock the kiosk during technical work",
+                    "/unlock - unlock the kiosk",
                     "/restart - restart the Raspberry Pi",
                     "/update - update the project, lock inputs, then open the new app version",
                     "/rollback [git-ref] - reset to a Git ref, default HEAD~1, then reopen the app",
                     "/printers - list printers and show the active printer",
                     "/setprinter <name> - set the active printer and CUPS default",
+                    "/autoprinter - find, verify and save an available network printer",
                     "/usecupsdefault - clear app printer override and use CUPS default",
                     "/setadminpassword <nova-lozinka> - promijeni lozinku admin ekrana (mala latinična slova i brojevi, 8-64)",
                     "/workinghours [on|off|status] - uključi ili isključi ograničenje 08:00-15:00",
@@ -351,6 +363,7 @@ class TelegramControlBot:
                 f"Time: {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}",
                 f"Host: {socket.gethostname()}",
                 f"Kiosk window: {'hidden' if hidden else 'visible'}",
+                f"Terminal lock: {'locked' if get_terminal_locked() else 'unlocked'}",
                 f"Working hours: {config.working_hours_status_text()}",
                 f"Internet: {'yes' if network.get('internet') else 'no'} - {network.get('internet_message')}",
                 f"SSID: {network.get('ssid') or '(unknown)'}",
@@ -469,6 +482,7 @@ class TelegramControlBot:
             "Uvjerenja Terminal status:",
             f"Uptime: {uptime_seconds // 3600}h {(uptime_seconds % 3600) // 60}m",
             f"Kiosk window: {'hidden' if hidden else 'visible'}",
+            f"Terminal lock: {'locked' if get_terminal_locked() else 'unlocked'}",
             f"Working hours: {config.working_hours_status_text()}",
             f"Active command: {self._active_command or 'none'}",
             f"Disk free /: {storage.get('root_free')} of {storage.get('root_total')} ({storage.get('root_used_percent')} used)",
@@ -696,6 +710,27 @@ class TelegramControlBot:
         except Exception as exc:
             log_error(f"[Telegram] set printer failed: {exc}")
             self._send_message(chat_id, f"Printer was not changed: {exc}")
+
+    def _auto_select_printer(self, chat_id: int | str | None) -> None:
+        printer_name, code, message = detect_available_printer(get_selected_printer())
+        if code != "OK" or not printer_name:
+            self._send_message(chat_id, f"Network printer could not be selected.\n{code}: {message}")
+            return
+        ok, set_code, result = set_cups_default_printer(printer_name)
+        if not ok:
+            self._send_message(chat_id, f"Network printer was found but could not be saved.\n{set_code}: {result}")
+            return
+        set_selected_printer(printer_name)
+        self._send_message(chat_id, f"Network printer verified and saved.\nActive printer: {printer_name}")
+
+    def _set_terminal_lock(self, chat_id: int | str | None, locked: bool) -> None:
+        set_terminal_locked(locked)
+        self._set_update_input_locked(
+            locked,
+            "Терминал је привремено закључан због техничких радова." if locked else None,
+        )
+        state = "locked" if locked else "unlocked"
+        self._send_message(chat_id, f"Terminal is now {state}. This state is saved after restart.")
 
     def _use_cups_default(self, chat_id: int | str | None) -> None:
         clear_selected_printer()

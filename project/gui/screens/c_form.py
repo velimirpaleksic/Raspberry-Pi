@@ -1173,9 +1173,7 @@ class FormScreen(tk.Frame):
                 self.godina_entry.icursor("end")
             except Exception:
                 pass
-            if len(suffix) == 2 and self.active_entry is self.godina_entry:
-                self._focus_date_target("mjesec_entry")
-            elif self.kbd and self.active_entry is self.godina_entry:
+            if self.kbd and self.active_entry is self.godina_entry:
                 self.kbd.set_active_entry(self.godina_entry)
         except Exception:
             log_keyboard_exception("[VK] Year input handler failed")
@@ -1189,10 +1187,7 @@ class FormScreen(tk.Frame):
                 self.mjesec_entry.icursor("end")
             except Exception:
                 pass
-            should_advance = len(current) == 2 or (len(current) == 1 and current in {"2", "3", "4", "5", "6", "7", "8", "9"})
-            if should_advance and self.active_entry is self.mjesec_entry:
-                self._focus_date_target("dan_entry")
-            elif self.kbd and self.active_entry is self.mjesec_entry:
+            if self.kbd and self.active_entry is self.mjesec_entry:
                 self.kbd.set_active_entry(self.mjesec_entry)
         except Exception:
             log_keyboard_exception("[VK] Month input handler failed")

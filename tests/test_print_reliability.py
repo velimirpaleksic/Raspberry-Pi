@@ -45,6 +45,21 @@ def fake_pdf_converter(order):
 
 
 class PrintServiceReliabilityTests(unittest.TestCase):
+    def test_printer_detection_ignores_usb_and_selects_network_queue(self):
+        completed = lambda stdout="", returncode=0: SimpleNamespace(returncode=returncode, stdout=stdout, stderr="")
+        responses = [
+            completed("system default destination: USBPrinter"),
+            completed("printer USBPrinter is idle\nprinter NetworkPrinter is idle"),
+            completed("device for USBPrinter: usb://HP/Test\ndevice for NetworkPrinter: socket://192.168.1.50"),
+        ]
+        with (
+            patch.object(printer_status.shutil, "which", return_value="/usr/bin/tool"),
+            patch.object(printer_status, "_run", side_effect=responses),
+            patch.object(printer_status, "_check_network_device_available", return_value=(True, "OK", "")),
+        ):
+            name, code, message = printer_status.detect_available_printer("USBPrinter")
+        self.assertEqual((name, code, message), ("NetworkPrinter", "OK", ""))
+
     def test_normalization_rebuilds_full_name(self):
         normalized = print_job._normalize_form_data(
             {"ime": "  Ана   Марија   Анић  ", "mjesto": "  KASINDO  ", "opstina": "pogrešna"}

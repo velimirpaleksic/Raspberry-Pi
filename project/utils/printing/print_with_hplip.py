@@ -7,9 +7,9 @@ import time
 from dataclasses import dataclass
 
 from project.core import config
-from project.core.runtime_settings import get_selected_printer
+from project.core.runtime_settings import get_selected_printer, set_selected_printer
 from project.utils.logging_utils import log_error
-from project.utils.printing.printer_status import wait_for_printer_readiness
+from project.utils.printing.printer_status import set_cups_default_printer, wait_for_printer_readiness
 
 
 def _classify_lp_error(detail: str) -> tuple[str, str]:
@@ -59,6 +59,12 @@ def print_with_hplip(file_path: str, preferred_printer: str | None = None) -> Pr
             log_error(f"Print failed - printer unavailable: {code} {message}")
             return PrintCommandResult(False, error_code=code, user_message=message)
         printer_name = message
+        if printer_name != selected_printer:
+            default_ok, _default_code, default_result = set_cups_default_printer(printer_name)
+            if default_ok:
+                set_selected_printer(printer_name)
+            else:
+                log_error(f"Could not persist automatically selected network printer '{printer_name}': {default_result}")
 
         attempts = max(1, config.PRINT_RETRY_ATTEMPTS)
         last_error: PrintCommandResult | None = None

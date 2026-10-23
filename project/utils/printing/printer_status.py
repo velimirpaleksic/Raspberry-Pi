@@ -148,6 +148,11 @@ def _is_virtual_print_device(uri: str) -> bool:
     return low.startswith(("file:", "cups-pdf:", "pdf:")) or "cups-pdf" in low or "print-to-pdf" in low
 
 
+def _is_network_print_device(uri: str) -> bool:
+    scheme = urllib.parse.urlparse((uri or "").strip()).scheme.lower()
+    return scheme in {"socket", "ipp", "ipps", "http", "https", "lpd", "dnssd"}
+
+
 def _network_target_from_uri(uri: str) -> tuple[str, int] | None:
     parsed = urllib.parse.urlparse((uri or "").strip())
     scheme = parsed.scheme.lower()
@@ -262,47 +267,44 @@ def detect_available_printer(preferred_name: str = "") -> Tuple[str, str, str]:
     """Resolve a usable printer queue.
 
     Returns (printer_name, code, user_message). code == OK when resolved.
-    Priority:
-    1) explicit preferred printer from runtime/env config
-    2) CUPS default printer
-    3) the only available printer
-    4) if multiple are available and exactly one is USB-backed, choose that USB printer
-    5) otherwise fail as ambiguous
+    Only network-backed queues are eligible. A stale USB/default selection is
+    ignored, and reachable network queues are tried in deterministic order.
     """
     if shutil.which("lpstat") is None or shutil.which("lp") is None:
         return "", "CUPS_MISSING", "CUPS printer tools are not installed or not available."
 
     preferred = (preferred_name or "").strip()
-    if preferred:
-        proc = _run("lpstat", "-p", preferred)
-        if proc.returncode == 0:
-            return preferred, "OK", ""
-
+    default_name = ""
     default_proc = _run("lpstat", "-d")
     if default_proc.returncode == 0:
         out = (default_proc.stdout or "").strip()
         if ":" in out:
             default_name = out.split(":", 1)[1].strip()
-            if default_name:
-                return default_name, "OK", ""
 
     list_proc = _run("lpstat", "-p")
     if list_proc.returncode == 0:
         printers = _parse_printers_from_lpstat(list_proc.stdout or "")
-        if len(printers) == 1:
-            return printers[0], "OK", ""
-        if len(printers) > 1:
-            device_proc = _run("lpstat", "-v")
-            if device_proc.returncode == 0:
-                devices = _parse_device_map(device_proc.stdout or "")
-                usb_printers = [name for name in printers if (devices.get(name, "").lower().startswith("usb://"))]
-                if len(usb_printers) == 1:
-                    return usb_printers[0], "OK", ""
+        device_proc = _run("lpstat", "-v")
+        if device_proc.returncode != 0:
+            return "", "PRN_DEVICE_CHECK_FAILED", "Could not read CUPS printer device addresses."
+        devices = _parse_device_map(device_proc.stdout or "")
+        network_printers = [name for name in printers if _is_network_print_device(devices.get(name, ""))]
+        ordered: list[str] = []
+        for requested in (preferred, default_name):
+            match = next((name for name in network_printers if name.lower() == requested.lower()), "") if requested else ""
+            if match and match not in ordered:
+                ordered.append(match)
+        ordered.extend(name for name in network_printers if name not in ordered)
+        last_code, last_message = "PRN_NETWORK_UNREACHABLE", "No configured network printer is reachable."
+        for name in ordered:
+            reachable, code, message = _check_network_device_available(devices.get(name, ""), name)
+            if reachable:
+                return name, "OK", ""
+            last_code, last_message = code, message
+        if ordered:
+            return "", last_code, last_message
 
-            joined = ", ".join(printers)
-            return "", "PRN_AMBIGUOUS", f"Multiple printers are available ({joined}). Choose one with /setprinter."
-
-    return "", "PRN_NOT_FOUND", "Printer was not found. Check USB, power, and CUPS setup."
+    return "", "PRN_NETWORK_NOT_FOUND", "No network printer is configured in CUPS."
 
 
 def get_printer_readiness(printer_name: str) -> Tuple[bool, str, str]:

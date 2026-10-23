@@ -334,7 +334,7 @@ class ScreenManager(tk.Tk):
 
         title = tk.Label(
             card,
-            text="Aplikacija se ažurira",
+            text="ТЕРМИНАЛ ЈЕ ПРИВРЕМЕНО ЗАКЉУЧАН",
             bg="#f8faf7",
             fg="#101820",
             font=("DejaVu Sans", 28, "bold"),
@@ -354,7 +354,7 @@ class ScreenManager(tk.Tk):
 
         footer = tk.Label(
             card,
-            text="Ekran, tastatura i miš su privremeno zaključani.",
+            text="У току су технички радови. Покушајте касније.",
             bg="#f8faf7",
             fg="#667085",
             font=("DejaVu Sans", 13),

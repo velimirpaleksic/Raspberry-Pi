@@ -11,6 +11,12 @@ _TOUCH_DEBUG = os.getenv("POTVRDE_TOUCH_DEBUG", "").strip() in {"1", "true", "TR
 _KEYBOARD_LOGGER: logging.Logger | None = None
 
 
+def space_insertion_allowed(text: str, cursor: int) -> bool:
+    value = str(text or "")
+    position = max(0, min(int(cursor), len(value)))
+    return bool(position > 0 and not value[position - 1 : position].isspace() and not value[position : position + 1].isspace())
+
+
 def _make_keyboard_log_handler() -> logging.Handler | None:
     directories: list[Path] = []
     try:
@@ -692,6 +698,16 @@ class VirtualKeyboard(tk.Frame):
             except Exception:
                 self._log_exception(f"[VK] Could not clear placeholder for {self._entry_description(entry)}")
                 return False, "active field unavailable"
+
+        if ch.isspace():
+            text = self._entry_effective_text(entry)
+            try:
+                pos = max(0, min(entry.index(tk.INSERT), len(text)))
+            except Exception:
+                pos = len(text)
+            if not space_insertion_allowed(text, pos):
+                self._after_edit(entry)
+                return False, "leading or repeated space blocked"
 
         if one_word and ch.isspace():
             # A stray space on a one-word field should be invisible and harmless.

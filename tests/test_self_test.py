@@ -70,6 +70,16 @@ class SelfTestServiceTests(unittest.TestCase):
 
 
 class TelegramSelfTestCommandTests(unittest.TestCase):
+    def test_lock_and_unlock_commands_persist_and_update_ui(self):
+        bot = object.__new__(TelegramControlBot)
+        bot._send_message = Mock()
+        bot._set_update_input_locked = Mock()
+        with patch("project.services.telegram_bot.set_terminal_locked") as save:
+            bot._set_terminal_lock(123, True)
+            save.assert_called_once_with(True)
+            bot._set_update_input_locked.assert_called_once()
+            self.assertIn("locked", bot._send_message.call_args.args[1])
+
     def test_selftest_command_runs_as_guarded_background_command(self):
         bot = TelegramControlBot()
         user_id = int(bot.allowed_user_id)

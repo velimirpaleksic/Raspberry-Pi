@@ -59,6 +59,14 @@ def set_working_hours_enabled(enabled: bool) -> None:
     config.WORKING_HOURS_ENABLED = value
 
 
+def get_terminal_locked() -> bool:
+    return bool(get_setting("terminal_locked", False))
+
+
+def set_terminal_locked(locked: bool) -> None:
+    set_setting("terminal_locked", bool(locked))
+
+
 def get_selected_printer() -> str:
     with _LOCK:
         settings = _read_settings_unlocked()
