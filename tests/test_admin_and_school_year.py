@@ -257,6 +257,12 @@ class AdminFlowTests(unittest.TestCase):
         self.assertIn("08:00 до 15:00", disclaimer)
         self.assertIn("привремено", disclaimer)
         self.assertEqual(message, "")
+
+    def test_start_screen_project_credit_is_complete(self):
+        from project.gui.screens.a_start import PROJECT_CREDIT
+
+        for value in ("II-3", "2025/2026", "Палексић Велимир", "Андреј Влачић", "Лазар Лаловић", "Милош Шуша"):
+            self.assertIn(value, PROJECT_CREDIT)
     def test_start_and_form_both_expose_admin_entry(self):
         root = Path(__file__).resolve().parents[1]
         self.assertIn("goto_admin", (root / "project/gui/screens/a_start.py").read_text(encoding="utf-8"))

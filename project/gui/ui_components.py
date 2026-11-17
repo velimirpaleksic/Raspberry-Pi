@@ -190,6 +190,8 @@ class TouchListPicker(tk.Label):
         selected = str(self.variable.get() or "").strip()
         if selected in self.values:
             self._page = self.values.index(selected) // self.page_size
+        else:
+            self._page = 0
         self._ensure_overlay()
         self._render_page()
         self._overlay.place(relx=0, rely=0, relwidth=1, relheight=1)
@@ -208,6 +210,9 @@ class TouchListPicker(tk.Label):
         except Exception:
             pass
         self._overlay.place_forget()
+
+    def reset_page(self) -> None:
+        self._page = 0
 
     def set_invalid(self, invalid: bool) -> None:
         color = self.INVALID_BORDER if invalid else self.NORMAL_BORDER

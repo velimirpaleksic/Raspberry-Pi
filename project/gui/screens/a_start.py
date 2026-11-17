@@ -3,7 +3,14 @@ import tkinter as tk
 from project.core import config
 from project.gui import screen_ids
 from project.gui.ui_components import TouchButton
+from project.services.print_counters import CounterStoreError, get_print_counters
 from project.utils.logging_utils import log_error
+
+
+PROJECT_CREDIT = (
+    "Пројекат ученика II-3, 2025/2026 — Машински техничар за компјутерско конструисање\n"
+    "Презентовали: Палексић Велимир, Андреј Влачић, Лазар Лаловић и Милош Шуша"
+)
 
 
 def start_availability_state() -> tuple[bool, str, str]:
@@ -28,6 +35,7 @@ class StartScreen(tk.Frame):
             self.manager = manager
             self.message_var = tk.StringVar(value="")
             self.disclaimer_var = tk.StringVar(value="")
+            self.total_printed_var = tk.StringVar(value="Укупно одштампано потврда: 0")
             self._refresh_after_id = None
 
             container = tk.Frame(self, bg="#000000", cursor="none")
@@ -90,6 +98,21 @@ class StartScreen(tk.Frame):
                 pady=12,
             )
             admin_btn.place(relx=0.97, rely=0.95, anchor="se")
+
+            footer = tk.Frame(container, bg="#000000", cursor="none")
+            footer.place(relx=0.44, rely=0.98, anchor="s")
+            total_label = tk.Label(
+                footer, textvariable=self.total_printed_var, font=("Arial", 14, "bold"),
+                fg="#f2f2f2", bg="#000000", cursor="none",
+            )
+            total_label.pack(pady=(0, 4))
+            credit_label = tk.Label(
+                footer, text=PROJECT_CREDIT, font=("Arial", 11), fg="#b8c0cc", bg="#000000",
+                justify="center", wraplength=930, cursor="none",
+            )
+            credit_label.pack()
+            for widget in (footer, total_label, credit_label):
+                widget.bind("<ButtonPress-1>", self._start_from_anywhere, add=True)
         except Exception as e:
             log_error(f"Failed to build 'StartScreen' UI elements: {e}")
 
@@ -101,6 +124,14 @@ class StartScreen(tk.Frame):
         if self.manager:
             self.manager.set_idle_suspended(True)
         self._refresh_working_hours_message()
+        self._refresh_print_total()
+
+    def _refresh_print_total(self) -> None:
+        try:
+            self.total_printed_var.set(f"Укупно одштампано потврда: {get_print_counters().total}")
+        except CounterStoreError as exc:
+            log_error(f"Failed to read print total on start screen: {exc}")
+            self.total_printed_var.set("Укупно одштампано потврда: недоступно")
 
     def on_hide(self):
         if self._refresh_after_id is not None:

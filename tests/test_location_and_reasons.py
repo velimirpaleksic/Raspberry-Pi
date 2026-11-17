@@ -2,7 +2,7 @@ import unittest
 
 from project.core import config
 from project.core.location_rules import municipality_for_place, normalize_location_key
-from project.gui.ui_components import paginate_values
+from project.gui.ui_components import TouchListPicker, paginate_values
 from project.gui.screens.c_form import FormScreen
 
 
@@ -90,6 +90,12 @@ class LocationRulesTests(unittest.TestCase):
 
 
 class ReasonPickerTests(unittest.TestCase):
+    def test_picker_reset_returns_to_first_page(self):
+        picker = object.__new__(TouchListPicker)
+        picker._page = 2
+        picker.reset_page()
+        self.assertEqual(picker._page, 0)
+
     def test_reasons_have_requested_order_and_only_requested_items(self):
         self.assertEqual(config.RAZLOZI, EXPECTED_REASONS)
 

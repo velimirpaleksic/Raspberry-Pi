@@ -1337,6 +1337,8 @@ class FormScreen(tk.Frame):
         self._set_entry_text(self.dan_entry, "")
         self._set_entry_text(self.mjesto_entry, "", placeholder=config.MJESTO_PLACEHOLDER)
         self._set_entry_text(self.opstina_entry, "", placeholder=config.OPSTINA_PLACEHOLDER)
+        if isinstance(self.razlog_cb, TouchListPicker):
+            self.razlog_cb.reset_page()
         if self.kbd:
             self.kbd.set_active_entry(self.ime_entry)
 
