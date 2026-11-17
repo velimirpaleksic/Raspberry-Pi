@@ -33,6 +33,7 @@ class PrintResult:
     error_code: Optional[str] = None
     user_message: Optional[str] = None
     detail: Optional[str] = None
+    total_print_count: Optional[int] = None
 
 
 def _now_local_str() -> str:
@@ -478,7 +479,14 @@ def _run_print_job_impl(
             check_storage_pressure_async(reason="print-success")
         except Exception as exc:
             log_error(f"[JOB] {job_id} could not queue storage check: {exc}")
-        return PrintResult(True, job_id, docx_path=str(output_docx), pdf_path=str(pdf_path))
+        total_count = payload.get("total_print_count")
+        return PrintResult(
+            True,
+            job_id,
+            docx_path=str(output_docx),
+            pdf_path=str(pdf_path),
+            total_print_count=total_count if isinstance(total_count, int) else None,
+        )
     except FileNotFoundError as e:
         log_error(f"[JOB] {job_id} file missing: {e}")
         return _fail(

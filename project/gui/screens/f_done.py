@@ -2,6 +2,18 @@ import tkinter as tk
 
 from project.gui import screen_ids
 from project.gui.ui_components import TouchButton
+from project.services.print_counters import CounterStoreError, get_print_counters
+from project.utils.logging_utils import log_error
+
+
+def format_secretary_time_saved(total_prints: int) -> str:
+    minutes = max(0, int(total_prints)) * 3.5
+    hours, remainder = divmod(int(round(minutes)), 60)
+    if hours and remainder:
+        return f"{hours} ч {remainder} мин"
+    if hours:
+        return f"{hours} ч"
+    return f"{remainder} мин"
 
 
 class DoneScreen(tk.Frame):
@@ -16,6 +28,16 @@ class DoneScreen(tk.Frame):
 
         tk.Label(container, text="ГОТОВО", font=("Arial", 34, "bold"), fg="#1b7d38", bg="#f5f5f5").pack(pady=(0, 10))
         tk.Label(container, text="Документ је послат на штампу.", font=("Arial", 20), bg="#f5f5f5", fg="#111111").pack()
+        tk.Label(
+            container, text="Потврду преузмите у канцеларији секретара.",
+            font=("Arial", 20, "bold"), bg="#f5f5f5", fg="#111111",
+        ).pack(pady=(8, 0))
+
+        self.statistics_var = tk.StringVar(value="")
+        tk.Label(
+            container, textvariable=self.statistics_var, font=("Arial", 16), bg="#f5f5f5",
+            fg="#344054", justify="center",
+        ).pack(pady=(18, 0))
 
         self.count_label = tk.Label(container, text="", font=("Arial", 18), bg="#f5f5f5", fg="#444444")
         self.count_label.pack(pady=(14, 4))
@@ -37,7 +59,23 @@ class DoneScreen(tk.Frame):
         if self.manager:
             self.manager.set_idle_suspended(False)
         self._seconds_left = 10
+        self._refresh_statistics()
         self._update_countdown()
+
+    def _refresh_statistics(self):
+        total = self.manager.state.get("last_total_print_count") if self.manager else None
+        if not isinstance(total, int):
+            try:
+                total = get_print_counters().total
+            except CounterStoreError as exc:
+                log_error(f"Failed to read print total on done screen: {exc}")
+                self.statistics_var.set("")
+                return
+        saved = format_secretary_time_saved(total)
+        self.statistics_var.set(
+            f"Укупно одштампано потврда: {total}\n"
+            f"Процијењено уштеђено вријеме секретару: {saved} (3–4 минута по потврди)"
+        )
 
     def on_idle_timeout(self):
         self._go_home()

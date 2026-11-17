@@ -104,12 +104,20 @@ class AdminScreen(tk.Frame):
         keyboard.bind_entry(entry, mode="alpha", uppercase_first=False, one_word=True, allow_numeric=True)
         keyboard.set_entry_uppercase(entry, False)
 
+        def toggle_case():
+            uppercase = not bool(getattr(entry, "_vk_manual_uppercase", False))
+            keyboard.set_entry_uppercase(entry, uppercase)
+            case_button.config(text="МАЛА СЛОВА" if uppercase else "ВЕЛИКА СЛОВА")
+            mode_button.config(text="БРОЈЕВИ")
+
         def toggle_mode():
             new_mode = "numeric" if keyboard.mode == "alpha" else "alpha"
             entry._vk_mode = new_mode
             keyboard.set_active_entry(entry)
             mode_button.config(text="СЛОВА" if new_mode == "numeric" else "БРОЈЕВИ")
 
+        case_button = self._button(keyboard_controls, "ВЕЛИКА СЛОВА", toggle_case, width=16)
+        case_button.pack(side="left", padx=5)
         mode_button = self._button(keyboard_controls, "БРОЈЕВИ", toggle_mode, width=14)
         mode_button.pack(side="left", padx=5)
         entry.focus_set()

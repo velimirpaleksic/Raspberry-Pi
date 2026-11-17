@@ -11,6 +11,7 @@ from project.core import runtime_settings
 from project.core.school_year import school_year_for_date
 from project.gui.screens.c_form import FormScreen
 from project.gui.screens.g_admin import AdminScreen, notify_admin_self_test_failure
+from project.gui.screens.f_done import format_secretary_time_saved
 from project.gui.virtual_keyboard import space_insertion_allowed
 from project.services.self_test import SelfTestCheck, SelfTestReport
 from project.services import app_control
@@ -43,9 +44,9 @@ class AdminAuthTests(unittest.TestCase):
                 self.assertNotIn("novasigurnalozinka", settings.read_text(encoding="utf-8"))
                 self.assertTrue(admin_auth.verify_admin_password("novasigurnalozinka"))
 
-    def test_password_accepts_lowercase_and_digits_only(self):
+    def test_password_accepts_latin_letters_and_digits(self):
         self.assertTrue(admin_auth.validate_admin_password("admin12345")[0])
-        self.assertFalse(admin_auth.validate_admin_password("Admin12345")[0])
+        self.assertTrue(admin_auth.validate_admin_password("Admin12345")[0])
         self.assertFalse(admin_auth.validate_admin_password("admin lozinka")[0])
         self.assertFalse(admin_auth.validate_admin_password("администратор")[0])
         self.assertFalse(admin_auth.validate_admin_password("admin!lozinka")[0])
@@ -198,6 +199,10 @@ class AppControlTests(unittest.TestCase):
 
 
 class AdminFlowTests(unittest.TestCase):
+    def test_secretary_saved_time_uses_three_and_half_minutes_per_print(self):
+        self.assertEqual(format_secretary_time_saved(1), "4 мин")
+        self.assertEqual(format_secretary_time_saved(20), "1 ч 10 мин")
+
     def test_virtual_space_blocks_leading_and_repeated_spaces(self):
         self.assertFalse(space_insertion_allowed("", 0))
         self.assertFalse(space_insertion_allowed("Ana ", 4))
@@ -261,7 +266,7 @@ class AdminFlowTests(unittest.TestCase):
     def test_start_screen_project_credit_is_complete(self):
         from project.gui.screens.a_start import PROJECT_CREDIT
 
-        for value in ("II-3", "2025/2026", "Палексић Велимир", "Андреј Влачић", "Лазар Лаловић", "Милош Шуша"):
+        for value in ("II-3", "2025/2026", "Палексић Велимир", "Влачић Андреј", "Лаловић Лазар", "Шуша Милош"):
             self.assertIn(value, PROJECT_CREDIT)
     def test_start_and_form_both_expose_admin_entry(self):
         root = Path(__file__).resolve().parents[1]

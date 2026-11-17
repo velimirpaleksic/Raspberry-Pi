@@ -242,6 +242,7 @@ class PrintingScreen(tk.Frame):
             self.manager.set_idle_suspended(False)
             self.manager.state["last_job_id"] = self._last_result.job_id if self._last_result else None
             self.manager.state["last_pdf_path"] = self._last_result.pdf_path if self._last_result else None
+            self.manager.state["last_total_print_count"] = self._last_result.total_print_count if self._last_result else None
             self.manager.show_frame(screen_ids.DONE)
 
     def _retry(self):
